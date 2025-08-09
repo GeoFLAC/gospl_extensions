@@ -1,11 +1,16 @@
-# gospl_tectonics_ext: Data-driven tectonics for goSPL
+# gospl_extensions
+
+1. `gospl_tectonics_ext`
+2. `gospl_model_ext` (TBA)
+
+## gospl_tectonics_ext: Data-driven tectonics for goSPL
 
 This out-of-tree extension adds a way to drive horizontal and vertical tectonic velocities from an external dataset (positions + 3-component velocities) whose sampling points don’t coincide with the model mesh. Velocities are interpolated to mesh nodes via k-nearest-neighbor inverse-distance weighting and then applied using goSPL’s existing advection machinery.
 
 - Core goSPL code remains untouched.
 - Import path: `from gospl_tectonics_ext import DataDrivenTectonics`.
 
-## Install or make importable
+### Install or make importable
 
 Option A — Add to PYTHONPATH (quickest):
 - Ensure `/home/eunseo/opt` is on PYTHONPATH so Python can find `gospl_tectonics_ext`.
@@ -13,7 +18,7 @@ Option A — Add to PYTHONPATH (quickest):
 Option B — Editable install (recommended):
 - Use the provided `pyproject.toml` and run an editable install.
 
-## Usage
+### Usage
 
 ```python
 from gospl.model import Model
@@ -42,11 +47,11 @@ Notes:
 - Handles coincident nodes robustly; respects flat vs spherical mode.
 - MPI safe: interpolation built on global coordinates; locals are sliced to `locIDs`.
 
-## Files
+### Files
 - `gospl_tectonics_ext/data_driven_tectonics.py`: the extension implementation.
 - `gospl_tectonics_ext/__init__.py`: re-exports `DataDrivenTectonics`.
 
-## Packaging (optional)
+### Packaging (optional)
 A minimal `pyproject.toml` is included. To install in editable mode:
 
 ```bash
