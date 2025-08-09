@@ -1,6 +1,7 @@
 # Python
 __pycache__/
 *.py[cod]
+*.so
 *.egg-info/
 .build/
 build/
@@ -10,3 +11,21 @@ dist/
 .mypy_cache/
 .pytest_cache/
 .ipynb_checkpoints/
+.coverage
+htmlcov/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# goSPL specific
+output/
+*.h5
+*.npz
