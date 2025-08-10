@@ -7,14 +7,13 @@ name = "gospl_extensions"
 version = "0.1.0"
 description = "Extensions for goSPL (landscape evolution model)"
 readme = "README.md"
-license = {text = "MIT"}
+license = "MIT"
 authors = [
     {name = "GeoFLAC", email = "your-email@example.com"}
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -49,24 +48,6 @@ dev = [
 # Note: goSPL is not listed as a pip dependency because it must be installed
 # via conda in the 'gospl' environment. Users must activate the gospl conda
 # environment before installing or using this package.
-
-[project.optional-dependencies]
-test = [
-    "pytest>=6.0",
-    "pytest-cov",
-]
-examples = [
-    "pandas",
-    "matplotlib",
-]
-dev = [
-    "pytest>=6.0",
-    "pytest-cov",
-    "pandas",
-    "matplotlib",
-    "black",
-    "flake8",
-]
 
 [project.urls]
 Homepage = "https://github.com/GeoFLAC/gospl_extensions"
