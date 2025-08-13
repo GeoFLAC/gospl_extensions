@@ -2,6 +2,29 @@
 
 1. `gospl_tectonics_ext` - Data-driven tectonics extension
 2. `gospl_model_ext` - Enhanced model with granular time control
+3. `cpp_interface` - C++ interface to goSPL extensions
+
+## Prerequisites
+
+**Important**: All extensions require the `gospl` conda environment to be activated:
+
+```bash
+conda activate gospl
+```
+
+The extensions depend on goSPL and its Fortran extensions, which are typically installed via conda.
+
+### Additional Requirements for C++ Interface
+
+For the `cpp_interface`, you'll also need C++ build tools:
+
+```bash
+# On Ubuntu/Debian:
+sudo apt install build-essential python3-dev python3-numpy
+
+# On CentOS/RHEL:
+sudo yum install gcc-c++ python3-devel python3-numpy
+```
 
 ## gospl_tectonics_ext: Data-driven tectonics for goSPL
 
@@ -10,24 +33,12 @@ This out-of-tree extension adds a way to drive horizontal and vertical tectonic 
 - Core goSPL code remains untouched.
 - Import path: `from gospl_tectonics_ext import DataDrivenTectonics`.
 
-### Prerequisites
-
-**Important**: This extension requires the `gospl` conda environment to be activated:
-
-```bash
-conda activate gospl
-```
-
-The extension depends on goSPL and its Fortran extensions, which are typically installed via conda.
-
 ### Install or make importable
 
 Option A — Add to PYTHONPATH (quickest):
-- Activate the gospl conda environment: `conda activate gospl`
 - Ensure `path/to/gospl_extensions` is on PYTHONPATH so Python can find `gospl_tectonics_ext`.
 
 Option B — Editable install (recommended):
-- Activate the gospl conda environment: `conda activate gospl`
 - Use the provided `pyproject.toml` and run an editable install.
 
 ### Usage
@@ -68,9 +79,6 @@ Notes:
 The extension includes a comprehensive test suite to ensure reliability:
 
 ```bash
-# Activate the gospl conda environment first
-conda activate gospl
-
 # Run tests using pytest (recommended)
 pytest tests/
 
@@ -91,9 +99,6 @@ Several example scripts demonstrate different use cases:
 
 #### Basic Example
 ```bash
-# Activate the gospl conda environment
-conda activate gospl
-
 cd examples
 python basic_example.py
 ```
@@ -101,9 +106,6 @@ Shows basic usage with synthetic velocity data.
 
 #### Advanced Example
 ```bash
-# Activate the gospl conda environment
-conda activate gospl
-
 cd examples
 python advanced_example.py
 ```
@@ -121,9 +123,6 @@ Demonstrates:
 A `pyproject.toml` is included for proper Python packaging. To install in editable mode:
 
 ```bash
-# Activate the gospl conda environment first
-conda activate gospl
-
 pip install -e path/to/gospl_extensions
 ```
 
@@ -133,9 +132,6 @@ This will also install required dependencies (numpy, scipy) and make the extensi
 For development with testing dependencies:
 
 ```bash
-# Activate the gospl conda environment first
-conda activate gospl
-
 pip install -e "path/to/gospl_extensions[dev]"
 ```
 
@@ -144,14 +140,6 @@ After this, `from gospl_tectonics_ext import DataDrivenTectonics` will work from
 ## gospl_model_ext: Enhanced Model with Granular Time Control
 
 This extension provides an `EnhancedModel` class that extends the goSPL `Model` class with additional methods for granular time control.
-
-### Prerequisites
-
-**Important**: This extension requires the `gospl` conda environment to be activated:
-
-```bash
-conda activate gospl
-```
 
 ### Features
 
@@ -184,14 +172,58 @@ model.runProcessesUntilTime(target_time=50000.0, dt=1000.0)
 ### Examples
 
 ```bash
-# Activate the gospl conda environment
-conda activate gospl
-
 cd examples
 python enhanced_model_example.py
 ```
 
 Shows controlled time-stepping with the EnhancedModel class, including demonstrations of all three new methods.
+
+## cpp_interface: C++ Interface to goSPL Extensions
+
+This directory provides a C++ interface to the goSPL extensions through Python C API bindings, allowing external C++ simulation codes to use the EnhancedModel and DataDrivenTectonics functionality.
+
+### Features
+
+- **C++ API**: Full C++ interface to EnhancedModel and DataDrivenTectonics
+- **Time Control**: Run goSPL simulations with granular time control from C++
+- **Velocity Data**: Apply time-dependent velocity fields from C++ code
+- **Integration Ready**: Easy integration with existing C++ simulation frameworks
+
+### Quick Start
+
+```bash
+# Build the interface
+cd cpp_interface
+make
+
+# Run basic tests
+make test
+
+# Run with goSPL simulation
+make test-gospl
+```
+
+### Basic Usage
+
+```cpp
+#include "gospl_extensions.h"
+
+// Initialize and create model
+initialize_gospl_extensions();
+ModelHandle model = create_enhanced_model("config.yml");
+
+// Run simulation with time control
+double elapsed = run_processes_for_dt(model, 1000.0, 1);
+
+// Apply velocity data
+apply_velocity_data(model, coords, velocities, num_points, 1.0, 3, 1.0);
+
+// Cleanup
+destroy_model(model);
+finalize_gospl_extensions();
+```
+
+For detailed documentation, API reference, build instructions, and examples, see [`cpp_interface/README.md`](cpp_interface/README.md).
 
 ## Project Structure
 
@@ -206,6 +238,15 @@ gospl_extensions/
 ├── gospl_model_ext/
 │   ├── __init__.py
 │   └── enhanced_model.py             # Enhanced Model implementation
+├── cpp_interface/
+│   ├── README.md                     # Detailed C++ interface documentation
+│   ├── gospl_extensions.h            # C++ header file
+│   ├── gospl_extensions.cpp          # C++ implementation
+│   ├── gospl_python_interface.py     # Python bridge module
+│   ├── enhanced_model_driver.cpp     # C++ driver example
+│   ├── test_interface.cpp            # Basic interface tests
+│   ├── Makefile                      # Build system
+│   └── CMakeLists.txt                # CMake configuration
 ├── tests/
 │   ├── __init__.py
 │   ├── test_data_driven_tectonics.py # Comprehensive test suite
@@ -221,10 +262,6 @@ gospl_extensions/
 
 ## Dependencies
 
-### Environment Requirements
-- **Conda environment**: Must activate the `gospl` conda environment before using this extension
-- **goSPL**: The main landscape evolution model with Fortran extensions
-
 ### Required Python Packages
 - `numpy`: Numerical computations
 - `scipy`: Spatial indexing and interpolation
@@ -239,11 +276,10 @@ gospl_extensions/
 To contribute to this extension:
 
 1. Clone the repository
-2. Activate the gospl conda environment: `conda activate gospl`
-3. Install in development mode: `pip install -e ".[dev]"`
-4. Run tests: `pytest tests/` or `python run_tests.py`
-5. Make your changes and ensure tests pass
-6. Add tests for new functionality
+2. Install in development mode: `pip install -e ".[dev]"`
+3. Run tests: `pytest tests/` or `python run_tests.py`
+4. Make your changes and ensure tests pass
+5. Add tests for new functionality
 
 ## Acknowledgments
 
