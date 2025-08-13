@@ -68,7 +68,8 @@ test: $(TEST_NAME) copy_python
 test-gospl: $(DRIVER_NAME) copy_python
 	@if [ -f "../examples/input-escarpment.yml" ]; then \
 		echo "Running goSPL test..."; \
-		export LD_LIBRARY_PATH=.:$$LD_LIBRARY_PATH && ./$(DRIVER_NAME) ../examples/input-escarpment.yml; \
+		cp gospl_python_interface.py ../examples/ && \
+		cd ../examples && export LD_LIBRARY_PATH=../cpp_interface:$$LD_LIBRARY_PATH && ../cpp_interface/$(DRIVER_NAME) input-escarpment.yml; \
 	else \
 		echo "❌ Config file not found. Please ensure input-escarpment.yml exists in ../examples/"; \
 	fi
