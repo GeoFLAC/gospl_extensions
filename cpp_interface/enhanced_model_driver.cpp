@@ -175,7 +175,7 @@ public:
 
 int main(int argc, char* argv[]) {
     // Default input file
-    std::string input_file = "input-escarpment.yml";
+    std::string input_file = "../examples/input-escarpment.yml";
     
     // Parse command line arguments
     if (argc > 1) {

@@ -47,7 +47,7 @@ Option B — Editable install (recommended):
 from gospl.model import Model
 from gospl_tectonics_ext import DataDrivenTectonics
 
-m = Model("input.yml", verbose=True)
+m = Model("input-escarpment.yml", verbose=True)
 
 # Bind the method to this instance without modifying Model inheritance
 m.apply_velocity_data = DataDrivenTectonics.apply_velocity_data.__get__(m, type(m))
@@ -117,7 +117,7 @@ Demonstrates:
 
 #### Sample Data
 - `examples/velocity_data.csv`: Sample velocity data for testing
-- `examples/input.yml`: Template goSPL configuration file
+- `examples/input-escarpment.yml`: Working goSPL configuration file
 
 ### Packaging (optional)
 A `pyproject.toml` is included for proper Python packaging. To install in editable mode:
@@ -257,7 +257,7 @@ gospl_extensions/
     ├── advanced_example.py           # Advanced features example
     ├── enhanced_model_example.py     # Enhanced Model example
     ├── velocity_data.csv             # Sample velocity data
-    └── input.yml                     # Template goSPL config
+    └── input-escarpment.yml          # Working goSPL config
 ```
 
 ## Dependencies

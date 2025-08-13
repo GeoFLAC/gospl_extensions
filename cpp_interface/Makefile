@@ -136,12 +136,4 @@ lib: $(LIB_NAME)
 driver: $(DRIVER_NAME)
 test-only: $(TEST_NAME)
 
-# Demo target
-demo: interface_demo
-
-interface_demo: $(LIB_NAME)
-	@echo "Building interface demo..."
-	$(CXX) $(CXXFLAGS) $(INCLUDES) -o interface_demo interface_demo.cpp -L. -lgospl_extensions $(LIBS)
-	@echo "✅ Demo built: interface_demo"
-
-.PHONY: all clean install uninstall test test-gospl copy_python debug-info help lib driver test-only demo
+.PHONY: all clean install uninstall test test-gospl copy_python debug-info help lib driver test-only
