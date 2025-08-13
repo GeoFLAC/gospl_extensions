@@ -165,6 +165,9 @@ def run_time_dependent_simulation(model, duration=10.0, dt=1.0):
         # In a real simulation, you would call:
         # model.runProcesses()
         
+        # With enhanced model, you can run for specific dt:
+        # model.runProcessesForDt(dt)
+        
         # Monitor some properties
         if hasattr(model, 'hdisp'):
             max_vel = np.max(np.linalg.norm(model.hdisp, axis=1))

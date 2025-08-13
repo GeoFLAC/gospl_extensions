@@ -55,7 +55,7 @@ Homepage = "https://github.com/GeoFLAC/gospl_extensions"
 "Source" = "https://github.com/GeoFLAC/gospl_extensions"
 
 [tool.setuptools.packages.find]
-include = ["gospl_tectonics_ext*"]
+include = ["gospl_tectonics_ext*", "gospl_model_ext*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

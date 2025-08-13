@@ -1,7 +1,7 @@
 # gospl_extensions
 
-1. `gospl_tectonics_ext`
-2. `gospl_model_ext` (TBA)
+1. `gospl_tectonics_ext` - Data-driven tectonics extension
+2. `gospl_model_ext` - Enhanced model with granular time control
 
 ## gospl_tectonics_ext: Data-driven tectonics for goSPL
 
@@ -141,6 +141,58 @@ pip install -e "path/to/gospl_extensions[dev]"
 
 After this, `from gospl_tectonics_ext import DataDrivenTectonics` will work from anywhere.
 
+## gospl_model_ext: Enhanced Model with Granular Time Control
+
+This extension provides an `EnhancedModel` class that extends the goSPL `Model` class with additional methods for granular time control.
+
+### Prerequisites
+
+**Important**: This extension requires the `gospl` conda environment to be activated:
+
+```bash
+conda activate gospl
+```
+
+### Features
+
+- **runProcessesForDt**: Run processes for a specific time step 'dt'
+- **runProcessesForSteps**: Run processes for a specified number of time steps  
+- **runProcessesUntilTime**: Run processes until a target time is reached
+
+### Usage
+
+```python
+from gospl_model_ext import EnhancedModel
+
+# Create enhanced model
+model = EnhancedModel("config.yml")
+
+# Run for specific dt
+model.runProcessesForDt(dt=1000.0)
+
+# Run for multiple steps with specific dt
+model.runProcessesForSteps(num_steps=10, dt=1000.0)
+
+# Run until target time is reached
+model.runProcessesUntilTime(target_time=50000.0, dt=1000.0)
+```
+
+### Files
+- `gospl_model_ext/enhanced_model.py`: the extension implementation.
+- `gospl_model_ext/__init__.py`: re-exports `EnhancedModel`.
+
+### Examples
+
+```bash
+# Activate the gospl conda environment
+conda activate gospl
+
+cd examples
+python enhanced_model_example.py
+```
+
+Shows controlled time-stepping with the EnhancedModel class, including demonstrations of all three new methods.
+
 ## Project Structure
 
 ```
@@ -151,13 +203,18 @@ gospl_extensions/
 ├── gospl_tectonics_ext/
 │   ├── __init__.py
 │   └── data_driven_tectonics.py      # Main implementation
+├── gospl_model_ext/
+│   ├── __init__.py
+│   └── enhanced_model.py             # Enhanced Model implementation
 ├── tests/
 │   ├── __init__.py
-│   └── test_data_driven_tectonics.py # Comprehensive test suite
+│   ├── test_data_driven_tectonics.py # Comprehensive test suite
+│   └── test_enhanced_model.py        # Enhanced Model tests
 └── examples/
     ├── __init__.py
     ├── basic_example.py              # Basic usage example
     ├── advanced_example.py           # Advanced features example
+    ├── enhanced_model_example.py     # Enhanced Model example
     ├── velocity_data.csv             # Sample velocity data
     └── input.yml                     # Template goSPL config
 ```
