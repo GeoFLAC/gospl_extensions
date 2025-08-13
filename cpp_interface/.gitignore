@@ -1,0 +1,34 @@
+# C++ Interface Build Artifacts
+*.so
+*.o
+*.a
+enhanced_model_driver
+interface_demo
+test_interface
+debug_test
+simple_test
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Build Outputs
+build/
+
+# Test Outputs and Logs
+*.log
+demo_output.txt
+driver_output.txt
+final_test.log
+output.txt
+
+# goSPL Output (generated during tests)
+escarpment/
+*.xmf
+*.xdmf
+h5/
+xmf/
+
+# Copied data files (keep originals in examples/)
+data/

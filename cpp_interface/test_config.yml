@@ -1,0 +1,26 @@
+# Simple test configuration for goSPL enhanced model
+# This is a minimal configuration to test the C++ interface
+
+domain:
+    nprocx: 1
+    nprocy: 1
+
+mesh:
+    file: 'simple_mesh.npz'
+
+time:
+    start: 0.0
+    end: 100.0
+    dt: 10.0
+
+climate:
+    uniform: 10.0
+
+tectonic:
+    - start: 0.0
+      end: 100.0
+      map: 'simple_uplift.npz'
+
+output:
+    dir: 'test_output'
+    makedir: True
