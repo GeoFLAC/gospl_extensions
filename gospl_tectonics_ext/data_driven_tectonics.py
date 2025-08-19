@@ -91,3 +91,54 @@ class DataDrivenTectonics(Tectonics):
             self._varAdvector()
 
         return
+
+    def interpolate_elevation_to_points(self, src_pts, k=3, power=1.0):
+        """
+        Interpolate self.hGlobal (global elevation field) to external points.
+        
+        :arg src_pts: array of shape (N, 3) containing target coordinates
+        :arg k: number of nearest neighbors for IDW interpolation (default: 3)
+        :arg power: inverse distance power exponent (default: 1.0)
+        :return: array of shape (N,) containing interpolated elevation values
+        """
+        src_pts = np.asarray(src_pts, dtype=np.float64)
+        if src_pts.ndim != 2 or src_pts.shape[1] != 3:
+            raise ValueError("src_pts must be of shape (N, 3)")
+        
+        npts = src_pts.shape[0]
+        if npts == 0:
+            raise ValueError("src_pts contains no points")
+        
+        # Get global elevation values as numpy array
+        h_values = self.hGlobal.getArray()
+        
+        # Limit k to available mesh nodes
+        k = max(1, min(int(k), self.mCoords.shape[0]))
+        
+        # Build KDTree from mesh coordinates for efficient nearest neighbor search
+        tree = spatial.cKDTree(self.mCoords, leafsize=10)
+        distances, idx = tree.query(src_pts, k=k)
+        
+        # Handle single neighbor case
+        if k == 1:
+            distances = distances[:, None]
+            idx = idx[:, None]
+        
+        # Inverse distance weighting
+        eps = 1.0e-20
+        if power == 1.0:
+            weights = 1.0 / np.maximum(distances, eps)
+        else:
+            weights = 1.0 / np.maximum(distances, eps) ** power
+        
+        # Get elevation values at neighbor nodes
+        neigh_elev = h_values[idx]  # (N, k)
+        wsum = np.sum(weights, axis=1)  # (N,)
+        h_interp = np.sum(weights * neigh_elev, axis=1) / np.maximum(wsum, eps)
+        
+        # Handle points that coincide exactly with mesh nodes
+        onIDs = np.where(distances[:, 0] < eps)[0]
+        if onIDs.size > 0:
+            h_interp[onIDs] = h_values[idx[onIDs, 0]]
+        
+        return h_interp

@@ -8,7 +8,7 @@
 /**
  * Enhanced Model C++ Driver
  * 
- * This C++ driver corresponds to enhanced_model_example.py and demonstrates:
+ * This C++ driver corresponds to enhanced_model_basic.py and demonstrates:
  * 1. Using EnhancedModel for granular time control
  * 2. Running processes for specific dt intervals
  * 3. Combining with DataDrivenTectonics for controlled simulations

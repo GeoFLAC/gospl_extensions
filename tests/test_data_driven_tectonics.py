@@ -27,6 +27,7 @@ class MockTectonics:
         self.tNow = 0.0
         self.lpoints = 0
         self.flatModel = True
+        self.hGlobal = None
 
     def _readAdvectionData(self, v_interp, timer):
         pass
@@ -320,6 +321,131 @@ class TestDataDrivenTectonics:
             # Should call getfacevelocity and _varAdvector
             mock_getface.assert_called_once()
             self.tectonics._varAdvector.assert_called_once()
+
+    def test_interpolate_elevation_to_points_basic(self):
+        """Test basic elevation interpolation functionality."""
+        # Mock hGlobal with sample elevation data
+        mock_hglobal = Mock()
+        elevation_values = np.array([10.0, 15.0, 20.0, 25.0, 12.5, 30.0, 35.0, 40.0, 32.5, 18.0])
+        mock_hglobal.getArray.return_value = elevation_values
+        self.tectonics.hGlobal = mock_hglobal
+        
+        # Test points to interpolate to
+        test_points = np.array([
+            [0.5, 0.0, 0.0],  # Between mesh points
+            [0.0, 0.5, 0.0],  # Between mesh points
+            [1.0, 1.0, 0.0]   # Exact mesh point
+        ])
+        
+        result = self.tectonics.interpolate_elevation_to_points(test_points, k=3)
+        
+        # Check result shape and type
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (3,)
+        assert result.dtype == np.float64
+        
+        # Values should be reasonable interpolations
+        assert np.all(np.isfinite(result))
+        assert np.all(result >= 0)  # Assuming positive elevations
+
+    def test_interpolate_elevation_invalid_input_shape(self):
+        """Test error handling for invalid input shapes in elevation interpolation."""
+        mock_hglobal = Mock()
+        mock_hglobal.getArray.return_value = np.ones(10)
+        self.tectonics.hGlobal = mock_hglobal
+        
+        # Wrong shape - 2D instead of 3D
+        with pytest.raises(ValueError, match="src_pts must be of shape \\(N, 3\\)"):
+            self.tectonics.interpolate_elevation_to_points(np.array([[1, 2]]))
+        
+        # Wrong dimensions
+        with pytest.raises(ValueError, match="src_pts must be of shape \\(N, 3\\)"):
+            self.tectonics.interpolate_elevation_to_points(np.array([1, 2, 3]))
+
+    def test_interpolate_elevation_empty_points(self):
+        """Test error handling for empty point array."""
+        mock_hglobal = Mock()
+        mock_hglobal.getArray.return_value = np.ones(10)
+        self.tectonics.hGlobal = mock_hglobal
+        
+        with pytest.raises(ValueError, match="src_pts contains no points"):
+            self.tectonics.interpolate_elevation_to_points(np.empty((0, 3)))
+
+    def test_interpolate_elevation_k_parameter(self):
+        """Test k parameter bounds in elevation interpolation."""
+        mock_hglobal = Mock()
+        elevation_values = np.array([10.0, 15.0, 20.0, 25.0, 12.5, 30.0, 35.0, 40.0, 32.5, 18.0])
+        mock_hglobal.getArray.return_value = elevation_values
+        self.tectonics.hGlobal = mock_hglobal
+        
+        test_points = np.array([[0.5, 0.5, 0.0]])
+        
+        # Test k=1 (single neighbor)
+        result_k1 = self.tectonics.interpolate_elevation_to_points(test_points, k=1)
+        assert result_k1.shape == (1,)
+        
+        # Test k larger than available points (should be clamped)
+        result_k_large = self.tectonics.interpolate_elevation_to_points(test_points, k=100)
+        assert result_k_large.shape == (1,)
+        
+        # Test k=0 (should be clamped to 1)
+        result_k0 = self.tectonics.interpolate_elevation_to_points(test_points, k=0)
+        assert result_k0.shape == (1,)
+
+    def test_interpolate_elevation_power_parameter(self):
+        """Test different power values in elevation interpolation."""
+        mock_hglobal = Mock()
+        elevation_values = np.array([10.0, 15.0, 20.0, 25.0, 12.5, 30.0, 35.0, 40.0, 32.5, 18.0])
+        mock_hglobal.getArray.return_value = elevation_values
+        self.tectonics.hGlobal = mock_hglobal
+        
+        test_points = np.array([[0.5, 0.5, 0.0]])
+        
+        # Test different power values
+        result_p1 = self.tectonics.interpolate_elevation_to_points(test_points, power=1.0)
+        result_p2 = self.tectonics.interpolate_elevation_to_points(test_points, power=2.0)
+        result_p05 = self.tectonics.interpolate_elevation_to_points(test_points, power=0.5)
+        
+        # Results should be different with different power values
+        assert not np.allclose(result_p1, result_p2)
+        assert not np.allclose(result_p1, result_p05)
+
+    def test_interpolate_elevation_coincident_points(self):
+        """Test elevation interpolation with points coincident to mesh nodes."""
+        mock_hglobal = Mock()
+        elevation_values = np.array([10.0, 15.0, 20.0, 25.0, 12.5, 30.0, 35.0, 40.0, 32.5, 18.0])
+        mock_hglobal.getArray.return_value = elevation_values
+        self.tectonics.hGlobal = mock_hglobal
+        
+        # Use exact mesh coordinates
+        test_points = self.tectonics.mCoords[:3]  # First 3 mesh points
+        
+        result = self.tectonics.interpolate_elevation_to_points(test_points, k=3)
+        
+        # Should return exact elevation values for coincident points
+        expected = elevation_values[:3]
+        np.testing.assert_allclose(result, expected, rtol=1e-10)
+
+    def test_interpolate_elevation_multiple_points(self):
+        """Test elevation interpolation with multiple points."""
+        mock_hglobal = Mock()
+        elevation_values = np.linspace(0, 100, 10)  # Simple linear elevation
+        mock_hglobal.getArray.return_value = elevation_values
+        self.tectonics.hGlobal = mock_hglobal
+        
+        # Create a grid of test points
+        x_vals = np.linspace(0, 2, 5)
+        y_vals = np.linspace(0, 2, 5)
+        xx, yy = np.meshgrid(x_vals, y_vals)
+        test_points = np.column_stack([xx.ravel(), yy.ravel(), np.zeros(25)])
+        
+        result = self.tectonics.interpolate_elevation_to_points(test_points, k=5)
+        
+        # Check result properties
+        assert result.shape == (25,)
+        assert np.all(np.isfinite(result))
+        assert np.all(result >= 0)
+        assert np.all(result <= 100)
 
 
 if __name__ == "__main__":

@@ -34,30 +34,31 @@ except ImportError as e:
 def create_synthetic_velocity_data(n_points=100, domain_size=10.0):
     """
     Create synthetic velocity data for testing.
-    
+
     Args:
         n_points: Number of velocity sampling points
         domain_size: Size of the square domain
-    
+
     Returns:
         dict with 'coords' and 'vel' arrays
     """
     # Create random sampling points
     coords = np.random.uniform(0, domain_size, size=(n_points, 3))
     coords[:, 2] = 0.0  # Keep z=0 for 2D case
-    
+
     # Create synthetic velocity field (simple rotation + vertical motion)
     center_x, center_y = domain_size / 2, domain_size / 2
     dx = coords[:, 0] - center_x
     dy = coords[:, 1] - center_y
-    
+
     # Rotational velocity field
     vx = -dy * 0.1  # Angular velocity
     vy = dx * 0.1
-    vz = np.sin(coords[:, 0] / domain_size * np.pi) * 0.05  # Vertical oscillation
-    
+    vz = np.sin(coords[:, 0] / domain_size * np.pi) * \
+        0.05  # Vertical oscillation
+
     vel = np.column_stack([vx, vy, vz])
-    
+
     return {
         "coords": coords,
         "vel": vel
@@ -68,41 +69,61 @@ def main():
     """Main example function."""
     print("DataDrivenTectonics Basic Example")
     print("=" * 40)
-    
+
     # Note: This example uses a real goSPL input file from the escarpment retreat example
     input_file = "input-escarpment.yml"  # Real goSPL input file with mesh data
-    
+
     try:
         # Initialize goSPL model
         print(f"Initializing goSPL model with {input_file}")
         model = Model(input_file, verbose=True)
-        
+
         # Bind the DataDrivenTectonics method to the model instance
         print("Binding DataDrivenTectonics method to model")
         model.apply_velocity_data = DataDrivenTectonics.apply_velocity_data.__get__(
             model, type(model)
         )
-        
+
         # Create synthetic velocity data
         print("Creating synthetic velocity data...")
         veldata = create_synthetic_velocity_data(n_points=50, domain_size=10.0)
         print(f"Created {veldata['coords'].shape[0]} velocity samples")
-        
+
         # Apply the external velocities
         print("Applying external velocity data to model...")
         model.apply_velocity_data(
-            veldata, 
+            veldata,
             timer=None,    # Use model's default time step
             k=3,           # Use 3 nearest neighbors
             power=1.0      # Linear inverse distance weighting
         )
-        
+
         print("Successfully applied external velocities!")
         print(f"Model now has interpolated velocities at mesh nodes")
-        
+
+        # Demonstrate elevation interpolation
+        print("\nTesting elevation interpolation...")
+
+        # Bind the elevation interpolation method
+        model.interpolate_elevation_to_points = DataDrivenTectonics.interpolate_elevation_to_points.__get__(
+            model, type(model)
+        )
+
+        # Create some test points for elevation sampling
+        test_points = np.array([
+            [2.0, 2.0, 0.0],
+            [5.0, 5.0, 0.0],
+            [8.0, 8.0, 0.0]
+        ])
+
+        # Interpolate current elevation field to these points
+        elevations = model.interpolate_elevation_to_points(
+            test_points, k=3, power=1.0)
+        print(f"Interpolated elevations at test points: {elevations}")
+
         # You can now run your goSPL simulation as usual
         # model.runProcesses()  # Run one time step
-        
+
     except FileNotFoundError:
         print(f"Error: Could not find input file '{input_file}'")
         print("Please create a goSPL input file or modify the path in this script.")

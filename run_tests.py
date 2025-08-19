@@ -89,8 +89,10 @@ def run_example_validation():
         return False
     
     example_files = [
-        'basic_example.py',
-        'advanced_example.py'
+        'data_driven_tectonics_basic.py',
+        'data_driven_tectonics_advanced.py',
+        'enhanced_model_basic.py',
+        'enhanced_model_advanced.py'
     ]
     
     for example_file in example_files:

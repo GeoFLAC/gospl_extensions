@@ -49,8 +49,9 @@ from gospl_tectonics_ext import DataDrivenTectonics
 
 m = Model("input-escarpment.yml", verbose=True)
 
-# Bind the method to this instance without modifying Model inheritance
+# Bind the methods to this instance without modifying Model inheritance
 m.apply_velocity_data = DataDrivenTectonics.apply_velocity_data.__get__(m, type(m))
+m.interpolate_elevation_to_points = DataDrivenTectonics.interpolate_elevation_to_points.__get__(m, type(m))
 
 veldata = {
     "coords": coords_np_array,  # shape (N, 3)
@@ -59,11 +60,30 @@ veldata = {
 
 # Interpolate and apply external velocities
 m.apply_velocity_data(veldata, timer=None, k=3, power=1.0)
+
+# Interpolate current elevation field to external points
+external_points = np.array([[x1, y1, z1], [x2, y2, z2], ...])  # shape (N, 3)
+elevations = m.interpolate_elevation_to_points(external_points, k=3, power=1.0)
 ```
 
 Behavior by advection scheme:
 - advscheme == 0 (semi-Lagrangian): builds interpolation to advected positions and schedules plate advection at `tNow + timer`.
 - advscheme > 0 (finite-volume IIOE/upwind): computes face velocities and advects immediately.
+
+### Methods
+
+**`apply_velocity_data(veldata, timer=None, k=3, power=1.0)`**
+- Interpolates external velocity data to mesh nodes and applies it using goSPL's advection machinery
+- `veldata`: dict or object with 'coords' (N,3) and 'vel' (N,3) arrays
+- `timer`: time interval for semi-Lagrangian scheme (defaults to model dt)
+- `k`: number of nearest neighbors for interpolation
+- `power`: inverse distance weighting power
+
+**`interpolate_elevation_to_points(src_pts, k=3, power=1.0)`**
+- Interpolates current elevation field (`hGlobal`) to external points
+- `src_pts`: target coordinates array of shape (N,3)
+- Returns: numpy array of interpolated elevations (N,)
+- Useful for data extraction, analysis, or coupling with other models
 
 Notes:
 - Requires goSPL to be importable and its Fortran extensions available (`gospl._fortran.getfacevelocity`).
@@ -88,31 +108,33 @@ python run_tests.py
 
 Test coverage includes:
 - Input validation and error handling
-- Interpolation accuracy with different parameters
+- Interpolation accuracy with different parameters (both velocity and elevation)
 - Both advection schemes (semi-Lagrangian and finite-volume)
 - Edge cases (coincident nodes, empty data, etc.)
+- Elevation interpolation with various k and power values
 - Mock testing that doesn't require goSPL installation
 
 ### Examples
 
 Several example scripts demonstrate different use cases:
 
-#### Basic Example
+#### DataDrivenTectonics Basic Example
 ```bash
 cd examples
-python basic_example.py
+python data_driven_tectonics_basic.py
 ```
-Shows basic usage with synthetic velocity data.
+Shows basic usage with synthetic velocity data and elevation interpolation.
 
-#### Advanced Example
+#### DataDrivenTectonics Advanced Example
 ```bash
 cd examples
-python advanced_example.py
+python data_driven_tectonics_advanced.py
 ```
 Demonstrates:
 - Loading velocity data from CSV files
 - Time-dependent velocity fields
 - Comparing interpolation parameters
+- Elevation field interpolation and sampling
 - Monitoring velocity field effects
 
 #### Sample Data
@@ -171,12 +193,23 @@ model.runProcessesUntilTime(target_time=50000.0, dt=1000.0)
 
 ### Examples
 
+#### EnhancedModel Basic Example
 ```bash
 cd examples
-python enhanced_model_example.py
+python enhanced_model_basic.py
 ```
-
 Shows controlled time-stepping with the EnhancedModel class, including demonstrations of all three new methods.
+
+#### EnhancedModel Advanced Example
+```bash
+cd examples
+python enhanced_model_advanced.py
+```
+Demonstrates:
+- Elevation tracking at velocity sampling points
+- Updating velocity coordinates based on evolving topography
+- Analyzing elevation changes before and after each time step
+- Advanced coupling between tectonics and topographic evolution
 
 ## cpp_interface: C++ Interface to goSPL Extensions
 
@@ -253,9 +286,10 @@ gospl_extensions/
 │   └── test_enhanced_model.py        # Enhanced Model tests
 └── examples/
     ├── __init__.py
-    ├── basic_example.py              # Basic usage example
-    ├── advanced_example.py           # Advanced features example
-    ├── enhanced_model_example.py     # Enhanced Model example
+    ├── data_driven_tectonics_basic.py    # DataDrivenTectonics basic usage
+    ├── data_driven_tectonics_advanced.py # DataDrivenTectonics advanced features
+    ├── enhanced_model_basic.py           # EnhancedModel basic usage
+    ├── enhanced_model_advanced.py        # EnhancedModel with elevation tracking
     ├── velocity_data.csv             # Sample velocity data
     └── input-escarpment.yml          # Working goSPL config
 ```

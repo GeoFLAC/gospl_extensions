@@ -18,7 +18,7 @@ The C++ interface allows external C++ simulation codes to:
 - `gospl_python_interface.py` - Python bridge module
 
 ### Driver and Examples
-- `enhanced_model_driver.cpp` - Main C++ driver (equivalent to enhanced_model_example.py)
+- `enhanced_model_driver.cpp` - Main C++ driver (equivalent to enhanced_model_basic.py)
 - `test_interface.cpp` - Simple test program for the interface
 
 ### Build System
@@ -118,7 +118,7 @@ export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
 ./enhanced_model_driver ../examples/input-escarpment.yml
 ```
 
-This runs the complete C++ equivalent of `enhanced_model_example.py`:
+This runs the complete C++ equivalent of `enhanced_model_basic.py`:
 - Creates EnhancedModel instance
 - Demonstrates all three new methods (`runProcessesForDt`, `runProcessesForSteps`, `runProcessesUntilTime`)
 - Runs controlled simulation with time-dependent tectonics
@@ -253,4 +253,4 @@ See `enhanced_model_driver.cpp` for a complete example that demonstrates:
 - Error handling and progress monitoring
 - Integration with DataDrivenTectonics
 
-The C++ driver produces equivalent results to `enhanced_model_example.py` but can be integrated into larger C++ simulation frameworks.
+The C++ driver produces equivalent results to `enhanced_model_basic.py` but can be integrated into larger C++ simulation frameworks.
