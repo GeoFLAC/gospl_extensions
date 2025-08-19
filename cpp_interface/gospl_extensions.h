@@ -122,6 +122,20 @@ double get_current_time(ModelHandle handle);
 double get_time_step(ModelHandle handle);
 
 /**
+ * Interpolate elevation field to external points.
+ * 
+ * @param handle Model handle
+ * @param coords Pointer to coordinates array (num_points * 3)
+ * @param num_points Number of points to interpolate to
+ * @param elevations Output elevations array (must be pre-allocated for num_points doubles)
+ * @param k Number of nearest neighbors for interpolation
+ * @param power Inverse distance weighting power
+ * @return 0 on success, -1 on error
+ */
+int interpolate_elevation_to_points(ModelHandle handle, const double* coords, int num_points,
+                                   double* elevations, int k, double power);
+
+/**
  * Create a rotational velocity field for testing.
  * This is a utility function that generates synthetic velocity data.
  * 

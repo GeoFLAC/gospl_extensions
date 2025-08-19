@@ -18,7 +18,8 @@ The C++ interface allows external C++ simulation codes to:
 - `gospl_python_interface.py` - Python bridge module
 
 ### Driver and Examples
-- `enhanced_model_driver.cpp` - Main C++ driver (equivalent to enhanced_model_basic.py)
+- `enhanced_model_driver.cpp` - Basic C++ driver (equivalent to enhanced_model_basic.py)
+- `enhanced_model_advanced_driver.cpp` - Advanced C++ driver with elevation tracking (equivalent to enhanced_model_advanced.py)
 - `test_interface.cpp` - Simple test program for the interface
 
 ### Build System
@@ -60,6 +61,9 @@ make test
 
 # Run with actual goSPL simulation (requires config file)
 make test-gospl
+
+# Run advanced simulation with elevation tracking
+make test-gospl-advanced
 
 # Clean build artifacts
 make clean
@@ -124,6 +128,22 @@ This runs the complete C++ equivalent of `enhanced_model_basic.py`:
 - Runs controlled simulation with time-dependent tectonics
 - Shows real landscape evolution physics
 
+### Advanced Driver with Elevation Tracking
+
+```bash
+# Build and run advanced driver
+make advanced-driver
+export LD_LIBRARY_PATH=.:$LD_LIBRARY_PATH
+./enhanced_model_advanced_driver ../examples/input-escarpment.yml
+```
+
+This runs the complete C++ equivalent of `enhanced_model_advanced.py`:
+- Creates EnhancedModel with elevation interpolation capabilities
+- Tracks elevation changes at velocity sampling points
+- Updates velocity coordinates based on evolving topography
+- Provides detailed before/after elevation analysis
+- Demonstrates sophisticated coupling between tectonics and topography
+
 ### 3. Integration in Your Code
 
 ```cpp
@@ -174,6 +194,7 @@ int main() {
 
 ### Velocity Data
 - `int apply_velocity_data(ModelHandle, const double* coords, const double* velocities, int num_points, double timer, int k, double power)` - Apply external velocities
+- `int interpolate_elevation_to_points(ModelHandle, const double* coords, int num_points, double* elevations, int k, double power)` - Interpolate elevation field to external points
 - `int create_velocity_field(double t, double center_x, double center_y, double amplitude, double* coords, double* velocities)` - Generate test velocity field
 
 ### Utilities

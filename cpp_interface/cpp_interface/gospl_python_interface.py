@@ -57,6 +57,9 @@ def create_enhanced_model(config_path: str) -> int:
         model.apply_velocity_data = DataDrivenTectonics.apply_velocity_data.__get__(
             model, type(model)
         )
+        model.interpolate_elevation_to_points = DataDrivenTectonics.interpolate_elevation_to_points.__get__(
+            model, type(model)
+        )
         
         # Store model and return handle
         handle = _next_handle
@@ -269,6 +272,43 @@ def get_time_step(handle: int) -> float:
         return -1.0
 
 
+def interpolate_elevation_to_points(handle: int, coords, k: int = 3, power: float = 1.0):
+    """
+    Interpolate elevation field to external points.
+    
+    Args:
+        handle: Model handle
+        coords: Coordinates array (num_points * 3)
+        k: Number of nearest neighbors
+        power: Inverse distance weighting power
+        
+    Returns:
+        Numpy array of interpolated elevations, or None on error
+    """
+    global _models
+    
+    try:
+        if handle not in _models:
+            return None
+            
+        model = _models[handle]
+        
+        # Convert to numpy array if not already
+        coords_array = np.array(coords)
+        if coords_array.ndim == 1:
+            # Assume it's flattened, reshape to (N, 3)
+            num_points = len(coords_array) // 3
+            coords_array = coords_array.reshape(num_points, 3)
+        
+        # Interpolate elevations
+        elevations = model.interpolate_elevation_to_points(coords_array, k=k, power=power)
+        return elevations
+        
+    except Exception as e:
+        print(f"Error in interpolate_elevation_to_points: {e}")
+        return None
+
+
 # C-compatible function exports using ctypes
 def export_c_functions():
     """Export functions with C-compatible signatures"""
@@ -292,6 +332,9 @@ def export_c_functions():
     apply_velocity_data.argtypes = [c_int, POINTER(c_double), POINTER(c_double), 
                                    c_int, c_double, c_int, c_double]
     apply_velocity_data.restype = c_int
+    
+    interpolate_elevation_to_points.argtypes = [c_int, POINTER(c_double), c_int, c_double]
+    interpolate_elevation_to_points.restype = POINTER(c_double)
     
     get_current_time.argtypes = [c_int]
     get_current_time.restype = c_double

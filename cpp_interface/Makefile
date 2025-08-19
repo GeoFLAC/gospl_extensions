@@ -20,15 +20,17 @@ LIBS = $(PYTHON_LIBS)
 # Source files
 LIB_SOURCES = gospl_extensions.cpp
 DRIVER_SOURCES = enhanced_model_driver.cpp  
+ADVANCED_DRIVER_SOURCES = enhanced_model_advanced_driver.cpp
 TEST_SOURCES = test_interface.cpp
 
 # Output files
 LIB_NAME = libgospl_extensions.so
 DRIVER_NAME = enhanced_model_driver
+ADVANCED_DRIVER_NAME = enhanced_model_advanced_driver
 TEST_NAME = test_interface
 
 # Default target
-all: $(LIB_NAME) $(DRIVER_NAME) $(TEST_NAME) copy_python
+all: $(LIB_NAME) $(DRIVER_NAME) $(ADVANCED_DRIVER_NAME) $(TEST_NAME) copy_python
 
 # Build shared library
 $(LIB_NAME): $(LIB_SOURCES) gospl_extensions.h
@@ -44,6 +46,12 @@ $(DRIVER_NAME): $(DRIVER_SOURCES) $(LIB_NAME) gospl_extensions.h
 	@echo "Building driver executable..."
 	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(DRIVER_NAME) $(DRIVER_SOURCES) -L. -lgospl_extensions $(LIBS)
 	@echo "✅ Driver built: $(DRIVER_NAME)"
+
+# Build advanced driver executable
+$(ADVANCED_DRIVER_NAME): $(ADVANCED_DRIVER_SOURCES) $(LIB_NAME) gospl_extensions.h
+	@echo "Building advanced driver executable..."
+	$(CXX) $(CXXFLAGS) $(INCLUDES) -o $(ADVANCED_DRIVER_NAME) $(ADVANCED_DRIVER_SOURCES) -L. -lgospl_extensions $(LIBS)
+	@echo "✅ Advanced driver built: $(ADVANCED_DRIVER_NAME)"
 
 # Build test executable
 $(TEST_NAME): $(TEST_SOURCES) $(LIB_NAME) gospl_extensions.h
@@ -74,19 +82,30 @@ test-gospl: $(DRIVER_NAME) copy_python
 		echo "❌ Config file not found. Please ensure input-escarpment.yml exists in ../examples/"; \
 	fi
 
+# Test advanced driver with actual goSPL
+test-gospl-advanced: $(ADVANCED_DRIVER_NAME) copy_python
+	@if [ -f "../examples/input-escarpment.yml" ]; then \
+		echo "Running advanced goSPL test..."; \
+		cp gospl_python_interface.py ../examples/ && \
+		cd ../examples && export LD_LIBRARY_PATH=../cpp_interface:$LD_LIBRARY_PATH && ../cpp_interface/$(ADVANCED_DRIVER_NAME) input-escarpment.yml; \
+	else \
+		echo "❌ Config file not found. Please ensure input-escarpment.yml exists in ../examples/"; \
+	fi
+
 # Clean build artifacts
 clean:
 	@echo "Cleaning build artifacts..."
-	rm -f $(LIB_NAME) $(DRIVER_NAME) $(TEST_NAME)
+	rm -f $(LIB_NAME) $(DRIVER_NAME) $(ADVANCED_DRIVER_NAME) $(TEST_NAME)
 	rm -rf cpp_interface
 	@echo "✅ Cleaned"
 
 # Install (optional)
-install: $(LIB_NAME) $(DRIVER_NAME)
+install: $(LIB_NAME) $(DRIVER_NAME) $(ADVANCED_DRIVER_NAME)
 	@echo "Installing..."
 	sudo cp $(LIB_NAME) /usr/local/lib/
 	sudo cp gospl_extensions.h /usr/local/include/
 	sudo cp $(DRIVER_NAME) /usr/local/bin/
+	sudo cp $(ADVANCED_DRIVER_NAME) /usr/local/bin/
 	sudo ldconfig
 	@echo "✅ Installed"
 
@@ -96,6 +115,7 @@ uninstall:
 	sudo rm -f /usr/local/lib/$(LIB_NAME)
 	sudo rm -f /usr/local/include/gospl_extensions.h
 	sudo rm -f /usr/local/bin/$(DRIVER_NAME)
+	sudo rm -f /usr/local/bin/$(ADVANCED_DRIVER_NAME)
 	sudo ldconfig
 	@echo "✅ Uninstalled"
 
@@ -115,11 +135,13 @@ help:
 	@echo "gospl_extensions C++ Interface Build System"
 	@echo ""
 	@echo "Targets:"
-	@echo "  all          - Build library, driver, and test (default)"
-	@echo "  lib          - Build shared library only"
-	@echo "  driver       - Build driver executable only"  
-	@echo "  test         - Build and run interface tests"
-	@echo "  test-gospl   - Run test with actual goSPL simulation"
+	@echo "  all                - Build library, drivers, and test (default)"
+	@echo "  lib                - Build shared library only"
+	@echo "  driver             - Build basic driver executable only"  
+	@echo "  advanced-driver    - Build advanced driver executable only"
+	@echo "  test               - Build and run interface tests"
+	@echo "  test-gospl         - Run test with actual goSPL simulation"
+	@echo "  test-gospl-advanced - Run advanced test with elevation tracking"
 	@echo "  clean        - Remove build artifacts"
 	@echo "  install      - Install to system (requires sudo)"
 	@echo "  uninstall    - Remove from system (requires sudo)"
@@ -135,6 +157,7 @@ help:
 # Individual targets
 lib: $(LIB_NAME)
 driver: $(DRIVER_NAME)
+advanced-driver: $(ADVANCED_DRIVER_NAME)
 test-only: $(TEST_NAME)
 
-.PHONY: all clean install uninstall test test-gospl copy_python debug-info help lib driver test-only
+.PHONY: all clean install uninstall test test-gospl test-gospl-advanced copy_python debug-info help lib driver advanced-driver test-only

@@ -15,6 +15,7 @@ static PyObject* run_dt_func = nullptr;
 static PyObject* run_steps_func = nullptr;
 static PyObject* run_until_func = nullptr;
 static PyObject* apply_vel_func = nullptr;
+static PyObject* interpolate_elev_func = nullptr;
 static PyObject* get_time_func = nullptr;
 static PyObject* get_dt_func = nullptr;
 
@@ -53,12 +54,13 @@ int initialize_gospl_extensions() {
     run_steps_func = PyObject_GetAttrString(gospl_module, "run_processes_for_steps");
     run_until_func = PyObject_GetAttrString(gospl_module, "run_processes_until_time");
     apply_vel_func = PyObject_GetAttrString(gospl_module, "apply_velocity_data");
+    interpolate_elev_func = PyObject_GetAttrString(gospl_module, "interpolate_elevation_to_points");
     get_time_func = PyObject_GetAttrString(gospl_module, "get_current_time");
     get_dt_func = PyObject_GetAttrString(gospl_module, "get_time_step");
     
     if (!create_model_func || !destroy_model_func || !run_dt_func || 
         !run_steps_func || !run_until_func || !apply_vel_func ||
-        !get_time_func || !get_dt_func) {
+        !interpolate_elev_func || !get_time_func || !get_dt_func) {
         PyErr_Print();
         std::cerr << "Failed to get function references from Python module" << std::endl;
         return -1;
@@ -76,6 +78,7 @@ void finalize_gospl_extensions() {
     Py_XDECREF(run_steps_func);
     Py_XDECREF(run_until_func);
     Py_XDECREF(apply_vel_func);
+    Py_XDECREF(interpolate_elev_func);
     Py_XDECREF(get_time_func);
     Py_XDECREF(get_dt_func);
     Py_XDECREF(gospl_module);
@@ -233,6 +236,51 @@ int apply_velocity_data(ModelHandle handle, const double* coords, const double* 
     Py_DECREF(result);
     
     return ret;
+}
+
+int interpolate_elevation_to_points(ModelHandle handle, const double* coords, int num_points,
+                                   double* elevations, int k, double power) {
+    if (!interpolate_elev_func) return -1;
+    
+    // Create numpy array from C array
+    npy_intp coord_dims[2] = {num_points, 3};
+    PyObject* coord_array = PyArray_SimpleNewFromData(2, coord_dims, NPY_DOUBLE, (void*)coords);
+    
+    if (!coord_array) {
+        PyErr_Print();
+        return -1;
+    }
+    
+    PyObject* args = PyTuple_New(4);
+    PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
+    PyTuple_SetItem(args, 1, coord_array);
+    PyTuple_SetItem(args, 2, PyLong_FromLong(k));
+    PyTuple_SetItem(args, 3, PyFloat_FromDouble(power));
+    
+    PyObject* result = PyObject_CallObject(interpolate_elev_func, args);
+    Py_DECREF(args);
+    
+    if (!result) {
+        PyErr_Print();
+        return -1;
+    }
+    
+    // Extract elevation values from numpy array result
+    if (PyArray_Check(result)) {
+        PyArrayObject* elev_array = (PyArrayObject*)result;
+        double* elev_data = (double*)PyArray_DATA(elev_array);
+        
+        // Copy elevation data to output array
+        for (int i = 0; i < num_points; i++) {
+            elevations[i] = elev_data[i];
+        }
+        
+        Py_DECREF(result);
+        return 0;
+    } else {
+        Py_DECREF(result);
+        return -1;
+    }
 }
 
 double get_current_time(ModelHandle handle) {
