@@ -229,11 +229,52 @@ This directory provides a C++ interface to the goSPL extensions through Python C
 cd cpp_interface
 make
 
+# Install locally for external C++ integration (e.g., DynEarthSol)
+make install-local
+
 # Run basic tests
 make test
 
 # Run with goSPL simulation
 make test-gospl
+```
+
+### DynEarthSol Integration
+
+The C++ interface includes special support for integration with DynEarthSol, a finite element geodynamic modeling code. After building with `make install-local`, the library and headers are placed in `gospl_extensions/lib/` and `gospl_extensions/include/` directories, which can be used by external build systems.
+
+#### Building for DynEarthSol Integration
+
+1. **Build gospl_extensions for local installation:**
+   ```bash
+   cd cpp_interface
+   make install-local
+   ```
+   
+   This creates:
+   - `../lib/libgospl_extensions.so` - Shared library
+   - `../include/gospl_extensions.h` - C++ header file
+
+2. **Integration with DynEarthSol:**
+   - Clone gospl_extensions in your DynEarthSol directory
+   - Set `use_gospl = 1` in DynEarthSol's Makefile
+   - Build DynEarthSol normally - it will automatically link with gospl_extensions
+
+3. **Usage in DynEarthSol:**
+   - Configure surface processes with `surface_process_option = 11`
+   - Specify GoSPL config file with `surface_process_gospl_config_file`
+   - DynEarthSol will automatically initialize and use GoSPL for landscape evolution
+
+#### Directory Structure After Local Installation
+```
+gospl_extensions/
+├── lib/
+│   └── libgospl_extensions.so        # Shared library for linking
+├── include/
+│   └── gospl_extensions.h            # Header for C++ integration
+└── cpp_interface/
+    ├── Makefile                      # Build system with install-local target
+    └── ...                          # Source files
 ```
 
 ### Basic Usage

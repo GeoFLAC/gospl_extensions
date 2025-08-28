@@ -109,6 +109,14 @@ install: $(LIB_NAME) $(DRIVER_NAME) $(ADVANCED_DRIVER_NAME)
 	sudo ldconfig
 	@echo "✅ Installed"
 
+# Install locally for DynEarthSol integration
+install-local: $(LIB_NAME)
+	@echo "Installing locally for DynEarthSol integration..."
+	@mkdir -p ../lib ../include
+	@cp $(LIB_NAME) ../lib/
+	@cp gospl_extensions.h ../include/
+	@echo "✅ Installed locally to gospl_extensions/lib and gospl_extensions/include"
+
 # Uninstall (optional)
 uninstall:
 	@echo "Uninstalling..."
@@ -142,9 +150,10 @@ help:
 	@echo "  test               - Build and run interface tests"
 	@echo "  test-gospl         - Run test with actual goSPL simulation"
 	@echo "  test-gospl-advanced - Run advanced test with elevation tracking"
-	@echo "  clean        - Remove build artifacts"
-	@echo "  install      - Install to system (requires sudo)"
-	@echo "  uninstall    - Remove from system (requires sudo)"
+	@echo "  clean              - Remove build artifacts"
+	@echo "  install            - Install to system (requires sudo)"
+	@echo "  install-local      - Install locally for DynEarthSol integration"
+	@echo "  uninstall          - Remove from system (requires sudo)"
 	@echo "  debug-info   - Show build configuration"
 	@echo "  help         - Show this help"
 	@echo ""
@@ -160,4 +169,4 @@ driver: $(DRIVER_NAME)
 advanced-driver: $(ADVANCED_DRIVER_NAME)
 test-only: $(TEST_NAME)
 
-.PHONY: all clean install uninstall test test-gospl test-gospl-advanced copy_python debug-info help lib driver advanced-driver test-only
+.PHONY: all clean install install-local uninstall test test-gospl test-gospl-advanced copy_python debug-info help lib driver advanced-driver test-only

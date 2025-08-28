@@ -56,6 +56,9 @@ The C++ interface allows external C++ simulation codes to:
 # Build everything (shared library + executables)
 make
 
+# Install locally for external C++ project integration
+make install-local
+
 # Run basic interface tests
 make test
 
@@ -70,6 +73,24 @@ make clean
 
 # Show build configuration
 make debug-info
+```
+
+#### Local Installation for External Projects
+
+The `install-local` target creates a standard library structure for integration with external C++ projects like DynEarthSol:
+
+```bash
+make install-local
+```
+
+This creates:
+- `../lib/libgospl_extensions.so` - Shared library for linking
+- `../include/gospl_extensions.h` - Header file for inclusion
+
+The external project's build system can then use standard linking:
+```makefile
+CXXFLAGS += -I./gospl_extensions/include
+LDFLAGS += -L./gospl_extensions/lib -lgospl_extensions
 ```
 
 ### Option 2: Using CMake
@@ -200,6 +221,97 @@ int main() {
 ### Utilities
 - `double get_current_time(ModelHandle)` - Get current simulation time
 - `double get_time_step(ModelHandle)` - Get model time step
+
+## DynEarthSol Integration
+
+The C++ interface is specifically designed to integrate with DynEarthSol, a finite element geodynamic modeling code. This allows for two-way coupling between geodynamic processes (DynEarthSol) and landscape evolution processes (GoSPL).
+
+### Integration Overview
+
+1. **DynEarthSol** handles:
+   - Tectonic deformation and stress evolution
+   - Temperature and fluid flow
+   - Rock rheology and material properties
+   - Mesh adaptation and remeshing
+
+2. **GoSPL** handles:
+   - Surface erosion and sedimentation
+   - Hillslope diffusion
+   - River incision and transport
+   - Marine processes
+
+3. **Coupling mechanism**:
+   - DynEarthSol provides surface velocities to GoSPL
+   - GoSPL evolves surface topography over each timestep
+   - Updated elevations are returned to DynEarthSol
+   - Process repeats for each simulation timestep
+
+### Integration Steps
+
+1. **Clone gospl_extensions in DynEarthSol directory:**
+   ```bash
+   cd /path/to/DynEarthSol
+   git clone https://github.com/GeoFLAC/gospl_extensions.git
+   ```
+
+2. **Build gospl_extensions for local integration:**
+   ```bash
+   conda activate gospl  # Activate gospl environment
+   cd gospl_extensions/cpp_interface
+   make install-local
+   cd ../..
+   ```
+
+3. **Configure DynEarthSol build:**
+   ```makefile
+   # In DynEarthSol Makefile, set:
+   use_gospl = 1
+   ```
+
+4. **Build DynEarthSol:**
+   ```bash
+   conda deactivate  # Use system compiler for DynEarthSol
+   make
+   ```
+
+5. **Configure simulation:**
+   ```cfg
+   # In DynEarthSol config file:
+   control.surface_process_option = 11
+   control.surface_process_gospl_config_file = "gospl_config.yml"
+   ```
+
+### Directory Structure After Integration
+
+```
+DynEarthSol/
+├── Makefile                          # use_gospl = 1
+├── gospl_extensions/                 # Cloned repository
+│   ├── lib/
+│   │   └── libgospl_extensions.so    # Built by make install-local
+│   ├── include/
+│   │   └── gospl_extensions.h        # Built by make install-local
+│   └── cpp_interface/
+│       ├── Makefile                  # Contains install-local target
+│       └── ...
+├── gospl_driver/                     # DynEarthSol GoSPL integration code
+│   ├── gospl-driver.hpp
+│   ├── gospl-driver.cxx
+│   └── examples/
+│       └── gospl_config_example.yml
+└── dynearthsol3d                     # Built executable with GoSPL support
+```
+
+### Usage in DynEarthSol
+
+When properly configured, DynEarthSol will:
+1. Initialize GoSPL at startup using the specified config file
+2. At each timestep, extract surface node coordinates and velocities
+3. Pass this data to GoSPL for landscape evolution
+4. Receive updated surface elevations from GoSPL
+5. Update the DynEarthSol mesh with new surface topography
+
+The integration is seamless and controlled by the `surface_process_option = 11` setting.
 
 ## Troubleshooting
 
