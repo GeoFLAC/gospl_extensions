@@ -79,7 +79,7 @@ public:
         
         // Method 1: Run for specific number of steps
         std::cout << "\n1. Running 3 steps with dt=0.5" << std::endl;
-        int steps_completed = run_processes_for_steps(model_handle, 3, 0.5, 1);
+        int steps_completed = run_processes_for_steps(model_handle, 3, 0.5, 1, 1);
         if (steps_completed > 0) {
             std::cout << "   Completed " << steps_completed << " steps" << std::endl;
         } else {
@@ -90,7 +90,7 @@ public:
         double current_time = get_current_time(model_handle);
         double target_time = current_time + 2.0;
         std::cout << "\n2. Running until t=" << target_time << std::endl;
-        int steps_until = run_processes_until_time(model_handle, target_time, 0.75, 1);
+        int steps_until = run_processes_until_time(model_handle, target_time, 0.75, 1, 1);
         if (steps_until > 0) {
             std::cout << "   Completed " << steps_until << " steps to reach target" << std::endl;
         } else {
@@ -151,7 +151,7 @@ public:
             }
             
             // Run processes for this specific time step
-            double elapsed = run_processes_for_dt(model_handle, step_dt, 1);
+            double elapsed = run_processes_for_dt(model_handle, step_dt, 1, 1);
             if (elapsed >= 0) {
                 std::cout << "  Completed step in " 
                           << std::fixed << std::setprecision(2) << elapsed << "s" << std::endl;

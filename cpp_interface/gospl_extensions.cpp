@@ -129,13 +129,14 @@ int destroy_model(ModelHandle handle) {
     return ret;
 }
 
-double run_processes_for_dt(ModelHandle handle, double dt, int verbose) {
+double run_processes_for_dt(ModelHandle handle, double dt, int verbose, int skip_tectonics) {
     if (!run_dt_func) return -1.0;
     
-    PyObject* args = PyTuple_New(3);
+    PyObject* args = PyTuple_New(4);
     PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
     PyTuple_SetItem(args, 1, PyFloat_FromDouble(dt));
     PyTuple_SetItem(args, 2, PyBool_FromLong(verbose));
+    PyTuple_SetItem(args, 3, PyBool_FromLong(skip_tectonics));
     
     PyObject* result = PyObject_CallObject(run_dt_func, args);
     Py_DECREF(args);
@@ -151,14 +152,15 @@ double run_processes_for_dt(ModelHandle handle, double dt, int verbose) {
     return elapsed;
 }
 
-int run_processes_for_steps(ModelHandle handle, int num_steps, double dt, int verbose) {
+int run_processes_for_steps(ModelHandle handle, int num_steps, double dt, int verbose, int skip_tectonics) {
     if (!run_steps_func) return -1;
     
-    PyObject* args = PyTuple_New(4);
+    PyObject* args = PyTuple_New(5);
     PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
     PyTuple_SetItem(args, 1, PyLong_FromLong(num_steps));
     PyTuple_SetItem(args, 2, PyFloat_FromDouble(dt));
     PyTuple_SetItem(args, 3, PyBool_FromLong(verbose));
+    PyTuple_SetItem(args, 4, PyBool_FromLong(skip_tectonics));
     
     PyObject* result = PyObject_CallObject(run_steps_func, args);
     Py_DECREF(args);
@@ -174,14 +176,15 @@ int run_processes_for_steps(ModelHandle handle, int num_steps, double dt, int ve
     return steps;
 }
 
-int run_processes_until_time(ModelHandle handle, double target_time, double dt, int verbose) {
+int run_processes_until_time(ModelHandle handle, double target_time, double dt, int verbose, int skip_tectonics) {
     if (!run_until_func) return -1;
     
-    PyObject* args = PyTuple_New(4);
+    PyObject* args = PyTuple_New(5);
     PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
     PyTuple_SetItem(args, 1, PyFloat_FromDouble(target_time));
     PyTuple_SetItem(args, 2, PyFloat_FromDouble(dt));
     PyTuple_SetItem(args, 3, PyBool_FromLong(verbose));
+    PyTuple_SetItem(args, 4, PyBool_FromLong(skip_tectonics));
     
     PyObject* result = PyObject_CallObject(run_until_func, args);
     Py_DECREF(args);

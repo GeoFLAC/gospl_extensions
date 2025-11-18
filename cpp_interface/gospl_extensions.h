@@ -64,9 +64,10 @@ int destroy_model(ModelHandle handle);
  * @param handle Model handle
  * @param dt Time step size
  * @param verbose Print progress information (0=false, 1=true)
+ * @param skip_tectonics Skip tectonics-related operations (0=false, 1=true)
  * @return Elapsed time on success, -1.0 on error
  */
-double run_processes_for_dt(ModelHandle handle, double dt, int verbose);
+double run_processes_for_dt(ModelHandle handle, double dt, int verbose, int skip_tectonics);
 
 /**
  * Run processes for a specified number of steps.
@@ -75,9 +76,10 @@ double run_processes_for_dt(ModelHandle handle, double dt, int verbose);
  * @param num_steps Number of steps to run
  * @param dt Time step size
  * @param verbose Print progress information (0=false, 1=true)
+ * @param skip_tectonics Skip tectonics-related operations (0=false, 1=true)
  * @return Number of steps completed on success, -1 on error
  */
-int run_processes_for_steps(ModelHandle handle, int num_steps, double dt, int verbose);
+int run_processes_for_steps(ModelHandle handle, int num_steps, double dt, int verbose, int skip_tectonics);
 
 /**
  * Run processes until target time is reached.
@@ -86,9 +88,10 @@ int run_processes_for_steps(ModelHandle handle, int num_steps, double dt, int ve
  * @param target_time Target simulation time
  * @param dt Time step size
  * @param verbose Print progress information (0=false, 1=true)
+ * @param skip_tectonics Skip tectonics-related operations (0=false, 1=true)
  * @return Number of steps completed on success, -1 on error
  */
-int run_processes_until_time(ModelHandle handle, double target_time, double dt, int verbose);
+int run_processes_until_time(ModelHandle handle, double target_time, double dt, int verbose, int skip_tectonics);
 
 /**
  * Apply velocity data to the model.

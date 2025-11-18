@@ -298,7 +298,7 @@ public:
             }
             
             // Run processes for this time step
-            double elapsed = run_processes_for_dt(model_handle, step_dt, 1);
+            double elapsed = run_processes_for_dt(model_handle, step_dt, 1, 1);
             if (elapsed >= 0) {
                 std::cout << "  Completed step in " 
                           << std::fixed << std::setprecision(2) << elapsed << "s" << std::endl;
@@ -424,7 +424,7 @@ int main(int argc, char* argv[]) {
         driver.demonstrate_elevation_interpolation();
         
         // Run controlled simulation with elevation tracking
-        driver.run_controlled_simulation_with_elevation_tracking(5.0, 1.0);
+        driver.run_controlled_simulation_with_elevation_tracking(50.0, 1.0);
         
         std::cout << "\n🎉 All demonstrations completed successfully!" << std::endl;
         

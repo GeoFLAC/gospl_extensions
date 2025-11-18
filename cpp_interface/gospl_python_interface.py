@@ -2,7 +2,9 @@
 Python C API wrapper for gospl_extensions to be used from C++.
 
 This module provides C-compatible functions that can be called from C++ code
-to interface with the EnhancedModel and DataDrivenTectonics extensions.
+to interface with the EnhancedModel. The EnhancedModel now includes built-in
+elevation interpolation capabilities, while velocity data application is
+handled through DataDrivenTectonics when needed.
 """
 
 import ctypes
@@ -16,6 +18,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 try:
     from gospl_model_ext import EnhancedModel
+    # Only import DataDrivenTectonics for apply_velocity_data method
     from gospl_tectonics_ext import DataDrivenTectonics
     print("Successfully imported gospl extensions for C++ interface")
 except ImportError as e:
@@ -50,14 +53,12 @@ def create_enhanced_model(config_path: str) -> int:
     global _models, _next_handle
     
     try:
-        # Create enhanced model
+        # Create enhanced model (now has interpolate_elevation_to_points built-in)
         model = EnhancedModel(config_path.decode() if isinstance(config_path, bytes) else config_path)
         
-        # Bind DataDrivenTectonics methods
+        # Only bind apply_velocity_data from DataDrivenTectonics as it's tectonics-specific
+        # interpolate_elevation_to_points is now directly available on EnhancedModel
         model.apply_velocity_data = DataDrivenTectonics.apply_velocity_data.__get__(
-            model, type(model)
-        )
-        model.interpolate_elevation_to_points = DataDrivenTectonics.interpolate_elevation_to_points.__get__(
             model, type(model)
         )
         
@@ -99,7 +100,7 @@ def destroy_model(handle: int) -> int:
         return -1
 
 
-def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float:
+def run_processes_for_dt(handle: int, dt: float, verbose: bool = False, skip_tectonics: bool = False) -> float:
     """
     Run processes for a specific time step.
     
@@ -107,6 +108,7 @@ def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float
         handle: Model handle
         dt: Time step size
         verbose: Print progress information
+        skip_tectonics: Skip tectonics-related operations
         
     Returns:
         Elapsed time, or -1.0 on error
@@ -118,7 +120,7 @@ def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float
             return -1.0
             
         model = _models[handle]
-        elapsed = model.runProcessesForDt(dt, verbose)
+        elapsed = model.runProcessesForDt(dt, verbose, skip_tectonics)
         return elapsed
         
     except Exception as e:
@@ -126,7 +128,7 @@ def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float
         return -1.0
 
 
-def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: bool = False) -> int:
+def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: bool = False, skip_tectonics: bool = False) -> int:
     """
     Run processes for a specified number of steps.
     
@@ -135,6 +137,7 @@ def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: boo
         num_steps: Number of steps to run
         dt: Time step size
         verbose: Print progress information
+        skip_tectonics: Skip tectonics-related operations
         
     Returns:
         Number of steps completed, or -1 on error
@@ -146,7 +149,7 @@ def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: boo
             return -1
             
         model = _models[handle]
-        elapsed_times = model.runProcessesForSteps(num_steps, dt, verbose)
+        elapsed_times = model.runProcessesForSteps(num_steps, dt, verbose, skip_tectonics)
         return len(elapsed_times)
         
     except Exception as e:
@@ -154,7 +157,7 @@ def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: boo
         return -1
 
 
-def run_processes_until_time(handle: int, target_time: float, dt: float, verbose: bool = False) -> int:
+def run_processes_until_time(handle: int, target_time: float, dt: float, verbose: bool = False, skip_tectonics: bool = False) -> int:
     """
     Run processes until target time is reached.
     
@@ -163,6 +166,7 @@ def run_processes_until_time(handle: int, target_time: float, dt: float, verbose
         target_time: Target simulation time
         dt: Time step size
         verbose: Print progress information
+        skip_tectonics: Skip tectonics-related operations
         
     Returns:
         Number of steps completed, or -1 on error
@@ -174,7 +178,7 @@ def run_processes_until_time(handle: int, target_time: float, dt: float, verbose
             return -1
             
         model = _models[handle]
-        elapsed_times = model.runProcessesUntilTime(target_time, dt, verbose)
+        elapsed_times = model.runProcessesUntilTime(target_time, dt, verbose, skip_tectonics)
         return len(elapsed_times)
         
     except Exception as e:
@@ -223,6 +227,49 @@ def apply_velocity_data(handle: int, coords, velocities,
         
     except Exception as e:
         print(f"Error in apply_velocity_data: {e}")
+        return -1
+
+
+def apply_elevation_data(handle: int, coords, elevations, 
+                        num_points: int, k: int = 3, power: float = 1.0) -> int:
+    """
+    Apply elevation data to the model's global elevation field.
+    
+    Args:
+        handle: Model handle
+        coords: Coordinates array (num_points * 3)
+        elevations: Elevations array (num_points)  
+        num_points: Number of data points
+        k: Number of nearest neighbors
+        power: Inverse distance weighting power
+        
+    Returns:
+        0 on success, -1 on error
+    """
+    global _models
+    
+    try:
+        if handle not in _models:
+            return -1
+            
+        model = _models[handle]
+        
+        # Convert to numpy arrays if not already
+        coords_array = np.array(coords).reshape(num_points, 3)
+        elev_array = np.array(elevations).reshape(num_points)
+        
+        # Create elevation data dictionary
+        elevdata = {
+            "coords": coords_array,
+            "elev": elev_array
+        }
+        
+        # Apply elevation data
+        model.apply_elevation_data(elevdata, k=k, power=power)
+        return 0
+        
+    except Exception as e:
+        print(f"Error in apply_elevation_data: {e}")
         return -1
 
 
@@ -332,6 +379,10 @@ def export_c_functions():
     apply_velocity_data.argtypes = [c_int, POINTER(c_double), POINTER(c_double), 
                                    c_int, c_double, c_int, c_double]
     apply_velocity_data.restype = c_int
+    
+    apply_elevation_data.argtypes = [c_int, POINTER(c_double), POINTER(c_double), 
+                                    c_int, c_int, c_double]
+    apply_elevation_data.restype = c_int
     
     interpolate_elevation_to_points.argtypes = [c_int, POINTER(c_double), c_int, c_double]
     interpolate_elevation_to_points.restype = POINTER(c_double)

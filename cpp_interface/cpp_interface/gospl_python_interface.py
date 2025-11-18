@@ -99,7 +99,7 @@ def destroy_model(handle: int) -> int:
         return -1
 
 
-def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float:
+def run_processes_for_dt(handle: int, dt: float, verbose: bool = False, skip_tectonics: bool = False) -> float:
     """
     Run processes for a specific time step.
     
@@ -107,6 +107,7 @@ def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float
         handle: Model handle
         dt: Time step size
         verbose: Print progress information
+        skip_tectonics: Skip tectonics-related operations
         
     Returns:
         Elapsed time, or -1.0 on error
@@ -118,7 +119,7 @@ def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float
             return -1.0
             
         model = _models[handle]
-        elapsed = model.runProcessesForDt(dt, verbose)
+        elapsed = model.runProcessesForDt(dt, verbose, skip_tectonics)
         return elapsed
         
     except Exception as e:
@@ -126,7 +127,7 @@ def run_processes_for_dt(handle: int, dt: float, verbose: bool = False) -> float
         return -1.0
 
 
-def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: bool = False) -> int:
+def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: bool = False, skip_tectonics: bool = False) -> int:
     """
     Run processes for a specified number of steps.
     
@@ -135,6 +136,7 @@ def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: boo
         num_steps: Number of steps to run
         dt: Time step size
         verbose: Print progress information
+        skip_tectonics: Skip tectonics-related operations
         
     Returns:
         Number of steps completed, or -1 on error
@@ -146,7 +148,7 @@ def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: boo
             return -1
             
         model = _models[handle]
-        elapsed_times = model.runProcessesForSteps(num_steps, dt, verbose)
+        elapsed_times = model.runProcessesForSteps(num_steps, dt, verbose, skip_tectonics)
         return len(elapsed_times)
         
     except Exception as e:
@@ -154,7 +156,7 @@ def run_processes_for_steps(handle: int, num_steps: int, dt: float, verbose: boo
         return -1
 
 
-def run_processes_until_time(handle: int, target_time: float, dt: float, verbose: bool = False) -> int:
+def run_processes_until_time(handle: int, target_time: float, dt: float, verbose: bool = False, skip_tectonics: bool = False) -> int:
     """
     Run processes until target time is reached.
     
@@ -163,6 +165,7 @@ def run_processes_until_time(handle: int, target_time: float, dt: float, verbose
         target_time: Target simulation time
         dt: Time step size
         verbose: Print progress information
+        skip_tectonics: Skip tectonics-related operations
         
     Returns:
         Number of steps completed, or -1 on error
@@ -174,7 +177,7 @@ def run_processes_until_time(handle: int, target_time: float, dt: float, verbose
             return -1
             
         model = _models[handle]
-        elapsed_times = model.runProcessesUntilTime(target_time, dt, verbose)
+        elapsed_times = model.runProcessesUntilTime(target_time, dt, verbose, skip_tectonics)
         return len(elapsed_times)
         
     except Exception as e:
