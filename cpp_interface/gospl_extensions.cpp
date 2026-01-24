@@ -15,6 +15,7 @@ static PyObject* run_dt_func = nullptr;
 static PyObject* run_steps_func = nullptr;
 static PyObject* run_until_func = nullptr;
 static PyObject* apply_vel_func = nullptr;
+static PyObject* apply_elev_func = nullptr;
 static PyObject* interpolate_elev_func = nullptr;
 static PyObject* get_time_func = nullptr;
 static PyObject* get_dt_func = nullptr;
@@ -54,12 +55,13 @@ int initialize_gospl_extensions() {
     run_steps_func = PyObject_GetAttrString(gospl_module, "run_processes_for_steps");
     run_until_func = PyObject_GetAttrString(gospl_module, "run_processes_until_time");
     apply_vel_func = PyObject_GetAttrString(gospl_module, "apply_velocity_data");
+    apply_elev_func = PyObject_GetAttrString(gospl_module, "apply_elevation_data");
     interpolate_elev_func = PyObject_GetAttrString(gospl_module, "interpolate_elevation_to_points");
     get_time_func = PyObject_GetAttrString(gospl_module, "get_current_time");
     get_dt_func = PyObject_GetAttrString(gospl_module, "get_time_step");
     
     if (!create_model_func || !destroy_model_func || !run_dt_func || 
-        !run_steps_func || !run_until_func || !apply_vel_func ||
+        !run_steps_func || !run_until_func || !apply_vel_func || !apply_elev_func ||
         !interpolate_elev_func || !get_time_func || !get_dt_func) {
         PyErr_Print();
         std::cerr << "Failed to get function references from Python module" << std::endl;
@@ -78,6 +80,7 @@ void finalize_gospl_extensions() {
     Py_XDECREF(run_steps_func);
     Py_XDECREF(run_until_func);
     Py_XDECREF(apply_vel_func);
+    Py_XDECREF(apply_elev_func);
     Py_XDECREF(interpolate_elev_func);
     Py_XDECREF(get_time_func);
     Py_XDECREF(get_dt_func);
@@ -228,6 +231,46 @@ int apply_velocity_data(ModelHandle handle, const double* coords, const double* 
     PyTuple_SetItem(args, 6, PyFloat_FromDouble(power));
     
     PyObject* result = PyObject_CallObject(apply_vel_func, args);
+    Py_DECREF(args);
+    
+    if (!result) {
+        PyErr_Print();
+        return -1;
+    }
+    
+    int ret = PyLong_AsLong(result);
+    Py_DECREF(result);
+    
+    return ret;
+}
+
+int apply_elevation_data(ModelHandle handle, const double* coords, const double* elevations,
+                        int num_points, int k, double power) {
+    if (!apply_elev_func) return -1;
+    
+    // Create numpy arrays from C arrays
+    npy_intp coord_dims[2] = {num_points, 3};
+    npy_intp elev_dims[1] = {num_points};
+    
+    PyObject* coord_array = PyArray_SimpleNewFromData(2, coord_dims, NPY_DOUBLE, (void*)coords);
+    PyObject* elev_array = PyArray_SimpleNewFromData(1, elev_dims, NPY_DOUBLE, (void*)elevations);
+    
+    if (!coord_array || !elev_array) {
+        PyErr_Print();
+        Py_XDECREF(coord_array);
+        Py_XDECREF(elev_array);
+        return -1;
+    }
+    
+    PyObject* args = PyTuple_New(6);
+    PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
+    PyTuple_SetItem(args, 1, coord_array);
+    PyTuple_SetItem(args, 2, elev_array);
+    PyTuple_SetItem(args, 3, PyLong_FromLong(num_points));
+    PyTuple_SetItem(args, 4, PyLong_FromLong(k));
+    PyTuple_SetItem(args, 5, PyFloat_FromDouble(power));
+    
+    PyObject* result = PyObject_CallObject(apply_elev_func, args);
     Py_DECREF(args);
     
     if (!result) {

@@ -139,6 +139,21 @@ int interpolate_elevation_to_points(ModelHandle handle, const double* coords, in
                                    double* elevations, int k, double power);
 
 /**
+ * Apply elevation data to the model's internal mesh.
+ * Updates the goSPL mesh elevations using external (DES) topography values.
+ * 
+ * @param handle Model handle
+ * @param coords Pointer to coordinates array (num_points * 3)
+ * @param elevations Pointer to elevations array (num_points)
+ * @param num_points Number of data points
+ * @param k Number of nearest neighbors for interpolation
+ * @param power Inverse distance weighting power
+ * @return 0 on success, -1 on error
+ */
+int apply_elevation_data(ModelHandle handle, const double* coords, const double* elevations,
+                        int num_points, int k, double power);
+
+/**
  * Create a rotational velocity field for testing.
  * This is a utility function that generates synthetic velocity data.
  * 
