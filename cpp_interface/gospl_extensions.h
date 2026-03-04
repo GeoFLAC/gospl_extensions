@@ -154,9 +154,62 @@ int apply_elevation_data(ModelHandle handle, const double* coords, const double*
                         int num_points, int k, double power);
 
 /**
+ * Interpolate DES vertical velocities (m/yr) onto GoSPL mesh nodes and store
+ * internally. Consumed by the next run_and_get_erosion() call, which runs GoSPL
+ * with skip_tectonics=True so the config-file tectonic archive cannot overwrite
+ * the stored uplift rate.
+ *
+ * @param handle     Model handle
+ * @param coords     DES surface node coordinates (num_points * 3)
+ * @param vz_yr      Vertical velocity at each node in m/yr (num_points)
+ * @param num_points Number of DES surface nodes
+ * @param k          IDW nearest-neighbour count
+ * @param power      IDW power exponent
+ * @return 0 on success, -1 on error
+ */
+int set_uplift_rate(ModelHandle handle, const double* coords, const double* vz_yr,
+                   int num_points, int k, double power);
+
+/**
+ * Run GoSPL for dt years and return net erosion (metres) at query coordinates.
+ * Uses native-mesh differencing (no extra IDW pass for the before/after trick).
+ * If set_uplift_rate() was called, the stored upsub is applied and GoSPL runs
+ * with skip_tectonics=True.
+ *
+ * @param handle     Model handle
+ * @param dt         Coupling interval in years
+ * @param coords     Query coordinates (num_points * 3)
+ * @param num_points Number of query points
+ * @param erosion    Output erosion array (must be pre-allocated for num_points doubles)
+ * @param k          IDW nearest-neighbour count
+ * @param power      IDW power exponent
+ * @return 0 on success, -1 on error
+ */
+int run_and_get_erosion(ModelHandle handle, double dt, const double* coords,
+                        int num_points, double* erosion, int k, double power);
+
+/**
+ * Gently blend GoSPL's internal elevation field toward the DES elevation.
+ * h_new[i] = h[i] + alpha * (h_des_on_mesh[i] - h[i])
+ * alpha=1.0 is a full reset; alpha~0.2 is a gentle nudge that preserves
+ * GoSPL's drainage network (flow accumulation, chi, river capture memory).
+ *
+ * @param handle     Model handle
+ * @param coords     DES surface node coordinates (num_points * 3)
+ * @param des_elev   DES elevation at each surface node in metres (num_points)
+ * @param num_points Number of DES surface nodes
+ * @param alpha      Blending strength [0, 1]
+ * @param k          IDW nearest-neighbour count
+ * @param power      IDW power exponent
+ * @return 0 on success, -1 on error
+ */
+int apply_drift_correction(ModelHandle handle, const double* coords, const double* des_elev,
+                           int num_points, double alpha, int k, double power);
+
+/**
  * Create a rotational velocity field for testing.
  * This is a utility function that generates synthetic velocity data.
- * 
+ *
  * @param t Current time
  * @param center_x X coordinate of rotation center
  * @param center_y Y coordinate of rotation center

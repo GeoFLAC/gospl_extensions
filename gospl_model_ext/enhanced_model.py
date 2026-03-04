@@ -452,3 +452,133 @@ class EnhancedModel(Model):
         :return: array of shape (N,) containing interpolated elevation values
         """
         return self.interpolate_elevation_to_points(src_pts, k=k, power=power)
+
+    # ------------------------------------------------------------------
+    # Redesigned coupling API (v2)
+    # ------------------------------------------------------------------
+
+    def _get_mesh_tree(self):
+        """Return a cached cKDTree of GoSPL mesh coordinates (built once)."""
+        if not hasattr(self, '_mesh_kdtree') or self._mesh_kdtree is None:
+            from scipy.spatial import cKDTree
+            self._mesh_kdtree = cKDTree(self.mCoords, leafsize=10)
+        return self._mesh_kdtree
+
+    def set_uplift_rate(self, src_pts, vz_yr, k=3, power=1.0):
+        """
+        Interpolate DES vertical velocities (m/yr) onto GoSPL mesh nodes and store
+        as self._upsub_override.  Consumed by the next run_and_get_erosion() call
+        (which runs GoSPL with skip_tectonics=True so the config-file tectonic
+        archive does not overwrite the override).
+
+        :param src_pts: (N, 3) DES surface node coordinates
+        :param vz_yr:   (N,)  vertical velocity at each DES node in m/yr
+        :param k:       number of IDW neighbours (default 3)
+        :param power:   IDW power exponent (default 1.0)
+        """
+        from scipy.spatial import cKDTree
+        src_pts = np.asarray(src_pts, dtype=np.float64)
+        vz_yr   = np.asarray(vz_yr,   dtype=np.float64)
+        k = max(1, min(int(k), src_pts.shape[0]))
+        src_tree = cKDTree(src_pts, leafsize=10)
+        dists, idxs = src_tree.query(self.mCoords, k=k)
+        if k == 1:
+            dists = dists[:, None]
+            idxs  = idxs[:, None]
+        eps = 1.0e-20
+        weights = 1.0 / np.maximum(dists, eps) ** power
+        onIDs = np.where(dists[:, 0] < eps)[0]
+        if onIDs.size > 0:
+            weights[onIDs] = 0.0
+            weights[onIDs, 0] = 1.0
+        weights /= weights.sum(axis=1, keepdims=True)
+        self._upsub_override = (weights * vz_yr[idxs]).sum(axis=1)  # (M,) m/yr, full mesh
+
+    def run_and_get_erosion(self, dt, query_pts, k=3, power=1.0):
+        """
+        Run GoSPL for *dt* years and return net erosion (metres) at *query_pts*.
+
+        Steps:
+          1. Snapshot hGlobal on the native GoSPL mesh (no IDW).
+          2. If set_uplift_rate() was called, apply the stored upsub to the local
+             partition and run with skip_tectonics=True.
+          3. Compute delta_h = hGlobal_after - hGlobal_before on the native mesh.
+          4. One IDW pass: interpolate delta_h to query_pts.
+
+        :param dt:         coupling interval in years
+        :param query_pts:  (N, 3) coordinates at which to return erosion
+        :param k:          IDW neighbours (default 3)
+        :param power:      IDW power exponent (default 1.0)
+        :return:           (N,) array of net erosion in metres (negative = erosion)
+        """
+        skip = hasattr(self, '_upsub_override') and self._upsub_override is not None
+        if skip:
+            old_upsub = self.upsub.copy() if hasattr(self, 'upsub') and self.upsub is not None else None
+            self.upsub = self._upsub_override[self.locIDs]  # local partition
+
+        h_before = self.hGlobal.getArray().copy()   # snapshot — must copy before run
+        self.runProcessesForDt(dt, verbose=False, skip_tectonics=skip)
+        h_after  = self.hGlobal.getArray()
+        delta_h  = h_after - h_before               # native mesh, no IDW error
+
+        if skip:
+            self._upsub_override = None
+            if old_upsub is not None:
+                self.upsub = old_upsub
+
+        # Single IDW pass: native-mesh delta_h → query_pts
+        query_pts = np.asarray(query_pts, dtype=np.float64)
+        tree = self._get_mesh_tree()
+        k_q = max(1, min(int(k), self.mCoords.shape[0]))
+        dists, idxs = tree.query(query_pts, k=k_q)
+        if k_q == 1:
+            dists = dists[:, None]
+            idxs  = idxs[:, None]
+        eps = 1.0e-20
+        weights = 1.0 / np.maximum(dists, eps) ** power
+        onIDs = np.where(dists[:, 0] < eps)[0]
+        if onIDs.size > 0:
+            weights[onIDs] = 0.0
+            weights[onIDs, 0] = 1.0
+        weights /= weights.sum(axis=1, keepdims=True)
+        erosion = (weights * delta_h[idxs]).sum(axis=1)  # (N,)
+        return erosion
+
+    def apply_drift_correction(self, src_pts, des_elevation, alpha=0.1, k=3, power=1.0):
+        """
+        Blend hGlobal gently toward the DES elevation without a full reset.
+
+        h_new[i] = h[i] + alpha * (h_des_on_mesh[i] - h[i])
+
+        alpha=1.0 is equivalent to a full reset; alpha≈0.2 is a gentle nudge
+        that preserves GoSPL's drainage network (flow accumulation, chi, etc.).
+
+        :param src_pts:       (N, 3) DES surface node coordinates
+        :param des_elevation: (N,)  DES elevation at each surface node (metres)
+        :param alpha:         blending strength in [0, 1] (default 0.1)
+        :param k:             IDW neighbours (default 3)
+        :param power:         IDW power exponent (default 1.0)
+        """
+        from scipy.spatial import cKDTree
+        src_pts       = np.asarray(src_pts,       dtype=np.float64)
+        des_elevation = np.asarray(des_elevation, dtype=np.float64)
+        k = max(1, min(int(k), src_pts.shape[0]))
+        src_tree = cKDTree(src_pts, leafsize=10)
+        dists, idxs = src_tree.query(self.mCoords, k=k)
+        if k == 1:
+            dists = dists[:, None]
+            idxs  = idxs[:, None]
+        eps = 1.0e-20
+        weights = 1.0 / np.maximum(dists, eps) ** power
+        onIDs = np.where(dists[:, 0] < eps)[0]
+        if onIDs.size > 0:
+            weights[onIDs] = 0.0
+            weights[onIDs, 0] = 1.0
+        weights /= weights.sum(axis=1, keepdims=True)
+        h_des_on_mesh = (weights * des_elevation[idxs]).sum(axis=1)
+
+        h_array = self.hGlobal.getArray()
+        h_array[:] += alpha * (h_des_on_mesh - h_array)
+        if hasattr(self, 'hLocal') and self.hLocal is not None:
+            h_local = self.hLocal.getArray()
+            h_local[:] = h_array[self.locIDs]

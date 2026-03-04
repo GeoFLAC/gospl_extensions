@@ -356,6 +356,93 @@ def interpolate_elevation_to_points(handle: int, coords, k: int = 3, power: floa
         return None
 
 
+def set_uplift_rate(handle: int, coords, vz_yr,
+                    num_points: int, k: int = 3, power: float = 1.0) -> int:
+    """
+    Interpolate DES vertical velocities (m/yr) onto the GoSPL mesh and store
+    internally. Consumed by the next run_and_get_erosion() call.
+
+    Args:
+        handle:     Model handle
+        coords:     Coordinates array (num_points * 3)
+        vz_yr:      Vertical velocity array (num_points,) in m/yr
+        num_points: Number of DES surface nodes
+        k:          IDW neighbours (default 3)
+        power:      IDW power exponent (default 1.0)
+
+    Returns:
+        0 on success, -1 on error
+    """
+    model = _models.get(handle)
+    if model is None:
+        return -1
+    try:
+        coords_array = np.asarray(coords).reshape(num_points, 3)
+        vz_array     = np.asarray(vz_yr).reshape(num_points)
+        model.set_uplift_rate(coords_array, vz_array, k=k, power=power)
+        return 0
+    except Exception as e:
+        print(f"Error in set_uplift_rate: {e}")
+        return -1
+
+
+def run_and_get_erosion(handle: int, dt: float, coords, num_points: int,
+                        k: int = 3, power: float = 1.0):
+    """
+    Run GoSPL for dt years and return net erosion (m) at the query coordinates.
+
+    Args:
+        handle:     Model handle
+        dt:         Coupling interval in years
+        coords:     Query coordinates (num_points * 3)
+        num_points: Number of query points
+        k:          IDW neighbours (default 3)
+        power:      IDW power exponent (default 1.0)
+
+    Returns:
+        numpy (num_points,) array of erosion in metres, or None on error
+    """
+    model = _models.get(handle)
+    if model is None:
+        return None
+    try:
+        coords_array = np.asarray(coords).reshape(num_points, 3)
+        return model.run_and_get_erosion(dt, coords_array, k=k, power=power)
+    except Exception as e:
+        print(f"Error in run_and_get_erosion: {e}")
+        return None
+
+
+def apply_drift_correction(handle: int, coords, des_elev, num_points: int,
+                           alpha: float = 0.1, k: int = 3, power: float = 1.0) -> int:
+    """
+    Gently blend GoSPL's hGlobal toward the DES elevation without a full reset.
+
+    Args:
+        handle:     Model handle
+        coords:     DES surface node coordinates (num_points * 3)
+        des_elev:   DES elevation at each surface node (num_points,) in metres
+        num_points: Number of DES surface nodes
+        alpha:      Blending strength [0, 1]; 0.2 = gentle nudge, 1.0 = full reset
+        k:          IDW neighbours (default 3)
+        power:      IDW power exponent (default 1.0)
+
+    Returns:
+        0 on success, -1 on error
+    """
+    model = _models.get(handle)
+    if model is None:
+        return -1
+    try:
+        coords_array = np.asarray(coords).reshape(num_points, 3)
+        elev_array   = np.asarray(des_elev).reshape(num_points)
+        model.apply_drift_correction(coords_array, elev_array, alpha=alpha, k=k, power=power)
+        return 0
+    except Exception as e:
+        print(f"Error in apply_drift_correction: {e}")
+        return -1
+
+
 # C-compatible function exports using ctypes
 def export_c_functions():
     """Export functions with C-compatible signatures"""

@@ -19,6 +19,10 @@ static PyObject* apply_elev_func = nullptr;
 static PyObject* interpolate_elev_func = nullptr;
 static PyObject* get_time_func = nullptr;
 static PyObject* get_dt_func = nullptr;
+// v2 redesigned coupling API
+static PyObject* set_uplift_rate_func        = nullptr;
+static PyObject* run_and_get_erosion_func    = nullptr;
+static PyObject* apply_drift_correction_func = nullptr;
 
 int initialize_gospl_extensions() {
     // Initialize Python interpreter
@@ -59,10 +63,15 @@ int initialize_gospl_extensions() {
     interpolate_elev_func = PyObject_GetAttrString(gospl_module, "interpolate_elevation_to_points");
     get_time_func = PyObject_GetAttrString(gospl_module, "get_current_time");
     get_dt_func = PyObject_GetAttrString(gospl_module, "get_time_step");
-    
-    if (!create_model_func || !destroy_model_func || !run_dt_func || 
+    // v2 redesigned coupling API
+    set_uplift_rate_func        = PyObject_GetAttrString(gospl_module, "set_uplift_rate");
+    run_and_get_erosion_func    = PyObject_GetAttrString(gospl_module, "run_and_get_erosion");
+    apply_drift_correction_func = PyObject_GetAttrString(gospl_module, "apply_drift_correction");
+
+    if (!create_model_func || !destroy_model_func || !run_dt_func ||
         !run_steps_func || !run_until_func || !apply_vel_func || !apply_elev_func ||
-        !interpolate_elev_func || !get_time_func || !get_dt_func) {
+        !interpolate_elev_func || !get_time_func || !get_dt_func ||
+        !set_uplift_rate_func || !run_and_get_erosion_func || !apply_drift_correction_func) {
         PyErr_Print();
         std::cerr << "Failed to get function references from Python module" << std::endl;
         return -1;
@@ -84,6 +93,9 @@ void finalize_gospl_extensions() {
     Py_XDECREF(interpolate_elev_func);
     Py_XDECREF(get_time_func);
     Py_XDECREF(get_dt_func);
+    Py_XDECREF(set_uplift_rate_func);
+    Py_XDECREF(run_and_get_erosion_func);
+    Py_XDECREF(apply_drift_correction_func);
     Py_XDECREF(gospl_module);
     
     // Finalize Python interpreter
@@ -368,6 +380,115 @@ double get_time_step(ModelHandle handle) {
     
     return dt;
 }
+
+// ---------------------------------------------------------------------------
+// v2 redesigned coupling API
+// ---------------------------------------------------------------------------
+
+int set_uplift_rate(ModelHandle handle, const double* coords, const double* vz_yr,
+                   int num_points, int k, double power) {
+    if (!set_uplift_rate_func) return -1;
+
+    npy_intp coord_dims[2] = {num_points, 3};
+    npy_intp vz_dims[1]    = {num_points};
+
+    PyObject* coord_array = PyArray_SimpleNewFromData(2, coord_dims, NPY_DOUBLE, (void*)coords);
+    PyObject* vz_array    = PyArray_SimpleNewFromData(1, vz_dims,    NPY_DOUBLE, (void*)vz_yr);
+
+    if (!coord_array || !vz_array) {
+        PyErr_Print();
+        Py_XDECREF(coord_array);
+        Py_XDECREF(vz_array);
+        return -1;
+    }
+
+    PyObject* args = PyTuple_New(6);
+    PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
+    PyTuple_SetItem(args, 1, coord_array);
+    PyTuple_SetItem(args, 2, vz_array);
+    PyTuple_SetItem(args, 3, PyLong_FromLong(num_points));
+    PyTuple_SetItem(args, 4, PyLong_FromLong(k));
+    PyTuple_SetItem(args, 5, PyFloat_FromDouble(power));
+
+    PyObject* result = PyObject_CallObject(set_uplift_rate_func, args);
+    Py_DECREF(args);
+
+    if (!result) { PyErr_Print(); return -1; }
+    int ret = PyLong_AsLong(result);
+    Py_DECREF(result);
+    return ret;
+}
+
+int run_and_get_erosion(ModelHandle handle, double dt, const double* coords,
+                        int num_points, double* erosion, int k, double power) {
+    if (!run_and_get_erosion_func) return -1;
+
+    npy_intp coord_dims[2] = {num_points, 3};
+    PyObject* coord_array = PyArray_SimpleNewFromData(2, coord_dims, NPY_DOUBLE, (void*)coords);
+
+    if (!coord_array) { PyErr_Print(); return -1; }
+
+    PyObject* args = PyTuple_New(6);
+    PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
+    PyTuple_SetItem(args, 1, PyFloat_FromDouble(dt));
+    PyTuple_SetItem(args, 2, coord_array);  // steals reference
+    PyTuple_SetItem(args, 3, PyLong_FromLong(num_points));
+    PyTuple_SetItem(args, 4, PyLong_FromLong(k));
+    PyTuple_SetItem(args, 5, PyFloat_FromDouble(power));
+
+    PyObject* result = PyObject_CallObject(run_and_get_erosion_func, args);
+    Py_DECREF(args);
+
+    if (!result) { PyErr_Print(); return -1; }
+
+    if (PyArray_Check(result)) {
+        PyArrayObject* arr = (PyArrayObject*)result;
+        double* data = (double*)PyArray_DATA(arr);
+        for (int i = 0; i < num_points; i++)
+            erosion[i] = data[i];
+        Py_DECREF(result);
+        return 0;
+    }
+    Py_DECREF(result);
+    return -1;
+}
+
+int apply_drift_correction(ModelHandle handle, const double* coords, const double* des_elev,
+                           int num_points, double alpha, int k, double power) {
+    if (!apply_drift_correction_func) return -1;
+
+    npy_intp coord_dims[2] = {num_points, 3};
+    npy_intp elev_dims[1]  = {num_points};
+
+    PyObject* coord_array = PyArray_SimpleNewFromData(2, coord_dims, NPY_DOUBLE, (void*)coords);
+    PyObject* elev_array  = PyArray_SimpleNewFromData(1, elev_dims,  NPY_DOUBLE, (void*)des_elev);
+
+    if (!coord_array || !elev_array) {
+        PyErr_Print();
+        Py_XDECREF(coord_array);
+        Py_XDECREF(elev_array);
+        return -1;
+    }
+
+    PyObject* args = PyTuple_New(7);
+    PyTuple_SetItem(args, 0, PyLong_FromLong(handle));
+    PyTuple_SetItem(args, 1, coord_array);
+    PyTuple_SetItem(args, 2, elev_array);
+    PyTuple_SetItem(args, 3, PyLong_FromLong(num_points));
+    PyTuple_SetItem(args, 4, PyFloat_FromDouble(alpha));
+    PyTuple_SetItem(args, 5, PyLong_FromLong(k));
+    PyTuple_SetItem(args, 6, PyFloat_FromDouble(power));
+
+    PyObject* result = PyObject_CallObject(apply_drift_correction_func, args);
+    Py_DECREF(args);
+
+    if (!result) { PyErr_Print(); return -1; }
+    int ret = PyLong_AsLong(result);
+    Py_DECREF(result);
+    return ret;
+}
+
+// ---------------------------------------------------------------------------
 
 int create_velocity_field(double t, double center_x, double center_y, double amplitude,
                          double* coords, double* velocities) {
