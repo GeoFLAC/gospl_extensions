@@ -464,6 +464,44 @@ class EnhancedModel(Model):
             self._mesh_kdtree = cKDTree(self.mCoords, leafsize=10)
         return self._mesh_kdtree
 
+    def set_surface_velocity(self, src_pts, vx_yr, vy_yr, vz_yr, k=3, power=1.0):
+        """
+        Interpolate all three DES surface velocity components (m/yr) onto the GoSPL
+        mesh and store for the next run_and_get_erosion() call.
+
+        - vz_yr is stored as _upsub_override (vertical uplift/subsidence)
+        - vx_yr, vy_yr are stored as _vx_override, _vy_override and applied as
+          semi-Lagrangian horizontal advection of hGlobal before GoSPL runs.
+
+        :param src_pts: (N, 3) DES surface node coordinates
+        :param vx_yr:   (N,)  x-velocity at each DES node in m/yr
+        :param vy_yr:   (N,)  y-velocity at each DES node in m/yr
+        :param vz_yr:   (N,)  z-velocity (uplift) at each DES node in m/yr
+        :param k:       number of IDW neighbours (default 3)
+        :param power:   IDW power exponent (default 1.0)
+        """
+        from scipy.spatial import cKDTree
+        src_pts = np.asarray(src_pts, dtype=np.float64)
+        vx_yr   = np.asarray(vx_yr,   dtype=np.float64)
+        vy_yr   = np.asarray(vy_yr,   dtype=np.float64)
+        vz_yr   = np.asarray(vz_yr,   dtype=np.float64)
+        k = max(1, min(int(k), src_pts.shape[0]))
+        src_tree = cKDTree(src_pts, leafsize=10)
+        dists, idxs = src_tree.query(self.mCoords, k=k)
+        if k == 1:
+            dists = dists[:, None]
+            idxs  = idxs[:, None]
+        eps = 1.0e-20
+        weights = 1.0 / np.maximum(dists, eps) ** power
+        onIDs = np.where(dists[:, 0] < eps)[0]
+        if onIDs.size > 0:
+            weights[onIDs] = 0.0
+            weights[onIDs, 0] = 1.0
+        weights /= weights.sum(axis=1, keepdims=True)
+        self._upsub_override = (weights * vz_yr[idxs]).sum(axis=1)
+        self._vx_override    = (weights * vx_yr[idxs]).sum(axis=1)
+        self._vy_override    = (weights * vy_yr[idxs]).sum(axis=1)
+
     def set_uplift_rate(self, src_pts, vz_yr, k=3, power=1.0):
         """
         Interpolate DES vertical velocities (m/yr) onto GoSPL mesh nodes and store
@@ -498,12 +536,18 @@ class EnhancedModel(Model):
         """
         Run GoSPL for *dt* years and return net erosion (metres) at *query_pts*.
 
-        Steps:
-          1. Snapshot hGlobal on the native GoSPL mesh (no IDW).
-          2. If set_uplift_rate() was called, apply the stored upsub to the local
-             partition and run with skip_tectonics=True.
-          3. Compute delta_h = hGlobal_after - hGlobal_before on the native mesh.
-          4. One IDW pass: interpolate delta_h to query_pts.
+        Steps when set_surface_velocity() was called:
+          1. Horizontal advection via GoSPL's native _varAdvector (FV scheme):
+             sets self.hdisp, calls getfacevelocity, then _varAdvector.
+             Falls back to IDW semi-Lagrangian only when advscheme == 0.
+          2. Set self.upsub from _upsub_override for GoSPL's native applyTectonics.
+          3. Null self.tecdata so getTectonics() returns early (no config overwrite),
+             but applyTectonics() still runs and applies the vertical uplift.
+          4. Snapshot hGlobal, run GoSPL (skip_tectonics=False), diff on native mesh.
+          5. One IDW pass: interpolate delta_h to query_pts.
+
+        When no velocity override is set, GoSPL runs normally with its config-file
+        tectonics (skip_tectonics=False).
 
         :param dt:         coupling interval in years
         :param query_pts:  (N, 3) coordinates at which to return erosion
@@ -511,20 +555,69 @@ class EnhancedModel(Model):
         :param power:      IDW power exponent (default 1.0)
         :return:           (N,) array of net erosion in metres (negative = erosion)
         """
-        skip = hasattr(self, '_upsub_override') and self._upsub_override is not None
-        if skip:
-            old_upsub = self.upsub.copy() if hasattr(self, 'upsub') and self.upsub is not None else None
-            self.upsub = self._upsub_override[self.locIDs]  # local partition
+        eps = 1.0e-20
+        has_vel   = hasattr(self, '_upsub_override') and self._upsub_override is not None
+        has_horiz = has_vel and (hasattr(self, '_vx_override') and self._vx_override is not None)
 
-        h_before = self.hGlobal.getArray().copy()   # snapshot — must copy before run
-        self.runProcessesForDt(dt, verbose=False, skip_tectonics=skip)
+        # --- Horizontal advection ---
+        if has_horiz:
+            if self.advscheme > 0:
+                # Use GoSPL's native FV advector (no extra IDW pass on mesh).
+                from gospl._fortran import getfacevelocity
+                nodeVel = np.zeros((self.lpoints, 3), dtype=np.float64)
+                nodeVel[:, 0] = self._vx_override[self.locIDs]
+                nodeVel[:, 1] = self._vy_override[self.locIDs]
+                self.hdisp = nodeVel
+                getfacevelocity(self.lpoints, nodeVel)
+                old_dt = self.dt
+                self.dt = dt          # _varAdvector uses self.dt for the time step
+                self._varAdvector()
+                self.dt = old_dt
+                self.hdisp = None
+            else:
+                # advscheme == 0 (plate semi-Lagrangian): fall back to IDW remap.
+                displaced = self.mCoords.copy()
+                displaced[:, 0] -= self._vx_override * dt
+                displaced[:, 1] -= self._vy_override * dt
+                mesh_tree = self._get_mesh_tree()
+                k_adv = max(1, min(int(k), self.mCoords.shape[0]))
+                adv_dists, adv_idxs = mesh_tree.query(displaced, k=k_adv)
+                if k_adv == 1:
+                    adv_dists = adv_dists[:, None]
+                    adv_idxs  = adv_idxs[:, None]
+                adv_w = 1.0 / np.maximum(adv_dists, eps) ** power
+                on = np.where(adv_dists[:, 0] < eps)[0]
+                if on.size > 0:
+                    adv_w[on] = 0.0
+                    adv_w[on, 0] = 1.0
+                adv_w /= adv_w.sum(axis=1, keepdims=True)
+                h = self.hGlobal.getArray()
+                h[:] = (adv_w * h[adv_idxs]).sum(axis=1)
+                if hasattr(self, 'hLocal') and hasattr(self, 'locIDs'):
+                    self.hLocal.getArray()[:] = h[self.locIDs]
+            self._vx_override = None
+            self._vy_override = None
+
+        # --- Vertical uplift: set self.upsub for GoSPL's native applyTectonics ---
+        old_upsub   = getattr(self, 'upsub', None)
+        old_tecdata = self.tecdata
+        if has_vel:
+            self.upsub   = self._upsub_override[self.locIDs]
+            # Null tecdata so getTectonics() returns immediately without loading
+            # the config-file archive, while applyTectonics() still runs normally.
+            self.tecdata = None
+
+        # Snapshot, run, diff on native mesh
+        h_before = self.hGlobal.getArray().copy()
+        self.runProcessesForDt(dt, verbose=False, skip_tectonics=False)
         h_after  = self.hGlobal.getArray()
-        delta_h  = h_after - h_before               # native mesh, no IDW error
+        delta_h  = h_after - h_before
 
-        if skip:
+        # Restore state
+        if has_vel:
+            self.tecdata        = old_tecdata
+            self.upsub          = old_upsub
             self._upsub_override = None
-            if old_upsub is not None:
-                self.upsub = old_upsub
 
         # Single IDW pass: native-mesh delta_h → query_pts
         query_pts = np.asarray(query_pts, dtype=np.float64)
@@ -534,15 +627,13 @@ class EnhancedModel(Model):
         if k_q == 1:
             dists = dists[:, None]
             idxs  = idxs[:, None]
-        eps = 1.0e-20
         weights = 1.0 / np.maximum(dists, eps) ** power
         onIDs = np.where(dists[:, 0] < eps)[0]
         if onIDs.size > 0:
             weights[onIDs] = 0.0
             weights[onIDs, 0] = 1.0
         weights /= weights.sum(axis=1, keepdims=True)
-        erosion = (weights * delta_h[idxs]).sum(axis=1)  # (N,)
-        return erosion
+        return (weights * delta_h[idxs]).sum(axis=1)  # (N,)
 
     def apply_drift_correction(self, src_pts, des_elevation, alpha=0.1, k=3, power=1.0):
         """

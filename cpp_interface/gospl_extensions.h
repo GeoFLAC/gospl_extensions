@@ -154,6 +154,30 @@ int apply_elevation_data(ModelHandle handle, const double* coords, const double*
                         int num_points, int k, double power);
 
 /**
+ * Interpolate all three DES surface velocity components (m/yr) onto GoSPL mesh
+ * nodes and store internally. Consumed by the next run_and_get_erosion() call,
+ * which runs GoSPL with skip_tectonics=True.
+ * vz is applied as uplift/subsidence; vx and vy drive semi-Lagrangian horizontal
+ * advection of the elevation field before erosion/deposition runs.
+ *
+ * @param handle     Model handle
+ * @param coords     DES surface node coordinates (num_points * 3)
+ * @param vx_yr      X-velocity at each node in m/yr (num_points)
+ * @param vy_yr      Y-velocity at each node in m/yr (num_points)
+ * @param vz_yr      Z-velocity (uplift) at each node in m/yr (num_points)
+ * @param num_points Number of DES surface nodes
+ * @param k          IDW nearest-neighbour count
+ * @param power      IDW power exponent
+ * @return 0 on success, -1 on error
+ */
+int set_surface_velocity(ModelHandle handle,
+                         const double* coords,
+                         const double* vx_yr,
+                         const double* vy_yr,
+                         const double* vz_yr,
+                         int num_points, int k, double power);
+
+/**
  * Interpolate DES vertical velocities (m/yr) onto GoSPL mesh nodes and store
  * internally. Consumed by the next run_and_get_erosion() call, which runs GoSPL
  * with skip_tectonics=True so the config-file tectonic archive cannot overwrite

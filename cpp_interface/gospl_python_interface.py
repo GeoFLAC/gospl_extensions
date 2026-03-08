@@ -356,6 +356,43 @@ def interpolate_elevation_to_points(handle: int, coords, k: int = 3, power: floa
         return None
 
 
+def set_surface_velocity(handle: int, coords, vx_yr, vy_yr, vz_yr,
+                         num_points: int, k: int = 3, power: float = 1.0) -> int:
+    """
+    Interpolate all three DES surface velocity components (m/yr) onto the GoSPL
+    mesh and store internally. Consumed by the next run_and_get_erosion() call.
+    vz drives uplift/subsidence; vx/vy drive semi-Lagrangian horizontal advection
+    of the elevation field.
+
+    Args:
+        handle:     Model handle
+        coords:     Coordinates array (num_points * 3)
+        vx_yr:      X-velocity array (num_points,) in m/yr
+        vy_yr:      Y-velocity array (num_points,) in m/yr
+        vz_yr:      Z-velocity (uplift) array (num_points,) in m/yr
+        num_points: Number of DES surface nodes
+        k:          IDW neighbours (default 3)
+        power:      IDW power exponent (default 1.0)
+
+    Returns:
+        0 on success, -1 on error
+    """
+    model = _models.get(handle)
+    if model is None:
+        return -1
+    try:
+        coords_array = np.asarray(coords).reshape(num_points, 3)
+        vx_array     = np.asarray(vx_yr).reshape(num_points)
+        vy_array     = np.asarray(vy_yr).reshape(num_points)
+        vz_array     = np.asarray(vz_yr).reshape(num_points)
+        model.set_surface_velocity(coords_array, vx_array, vy_array, vz_array,
+                                   k=k, power=power)
+        return 0
+    except Exception as e:
+        print(f"Error in set_surface_velocity: {e}")
+        return -1
+
+
 def set_uplift_rate(handle: int, coords, vz_yr,
                     num_points: int, k: int = 3, power: float = 1.0) -> int:
     """
