@@ -153,10 +153,9 @@ class EnhancedModel(Model):
             if skip_tectonics:
                 print("  (skipping tectonics operations)")
         
-        # Store original values that we need to manipulate for single-step execution
-        original_dt = self.dt
+        # Store original tEnd so we can restore it after the coupling interval
         original_tEnd = self.tEnd
-        
+
         # If skipping tectonics, we need to temporarily disable tectonics methods
         tectonics_methods_backup = {}
         if skip_tectonics:
@@ -165,17 +164,16 @@ class EnhancedModel(Model):
                 'getTectonics', 'applyTectonics', 'updatePaleoZ', 'applyForces',
                 '_getTectonics', '_applyTectonics', '_updatePaleoZ', '_applyForces'
             ]
-            
+
             for method_name in tectonics_method_names:
                 if hasattr(self, method_name):
                     tectonics_methods_backup[method_name] = getattr(self, method_name)
                     # Replace with a no-op function
                     setattr(self, method_name, lambda *args, **kwargs: None)
-        
+
         try:
-            # Set up for single time step execution by manipulating the time bounds
-            # This makes the original runProcesses method run for exactly one step
-            self.dt = dt
+            # Set tEnd to cover the coupling interval; GoSPL's runProcesses loop
+            # will iterate using its own internal timestep (self.dt unchanged).
             self.tEnd = self.tNow + dt
             
             # Record start time
@@ -194,15 +192,14 @@ class EnhancedModel(Model):
             return elapsed_time
             
         finally:
-            # Restore original values
-            self.dt = original_dt
+            # Restore tEnd (self.dt was never changed)
             self.tEnd = original_tEnd
-            
+
             # Restore tectonics methods if they were disabled
             if skip_tectonics:
                 for method_name, original_method in tectonics_methods_backup.items():
                     setattr(self, method_name, original_method)
-            
+
             # Note: don't restore tNow as it should have advanced by dt
 
     def runProcessesForSteps(self, num_steps, dt=None, verbose=False, skip_tectonics=False):
