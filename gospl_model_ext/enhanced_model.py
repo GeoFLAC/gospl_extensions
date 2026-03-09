@@ -153,7 +153,8 @@ class EnhancedModel(Model):
             if skip_tectonics:
                 print("  (skipping tectonics operations)")
         
-        # Store original tEnd so we can restore it after the coupling interval
+        # Store originals to restore after the coupling interval
+        original_dt   = self.dt
         original_tEnd = self.tEnd
 
         # If skipping tectonics, we need to temporarily disable tectonics methods
@@ -172,35 +173,33 @@ class EnhancedModel(Model):
                     setattr(self, method_name, lambda *args, **kwargs: None)
 
         try:
-            # Set tEnd to cover the coupling interval; GoSPL's runProcesses loop
-            # will iterate using its own internal timestep (self.dt unchanged).
+            # Use the coupling interval as GoSPL's timestep so runProcesses()
+            # takes exactly one step of length dt (one GoSPL step per coupling event).
+            self.dt   = dt
             self.tEnd = self.tNow + dt
-            
+
             # Record start time
             tstep = process_time()
-            
-            # Call the original runProcesses method, but it will only run one iteration
-            # because we set tEnd = tNow + dt
+
             self.runProcesses()
-            
+
             # Calculate elapsed time
             elapsed_time = process_time() - tstep
-            
+
             if verbose:
                 print(f"  Completed step in {elapsed_time:.3f} seconds, new t={self.tNow}")
-                
+
             return elapsed_time
-            
+
         finally:
-            # Restore tEnd (self.dt was never changed)
+            # Restore dt and tEnd; tNow is intentionally left advanced
+            self.dt   = original_dt
             self.tEnd = original_tEnd
 
             # Restore tectonics methods if they were disabled
             if skip_tectonics:
                 for method_name, original_method in tectonics_methods_backup.items():
                     setattr(self, method_name, original_method)
-
-            # Note: don't restore tNow as it should have advanced by dt
 
     def runProcessesForSteps(self, num_steps, dt=None, verbose=False, skip_tectonics=False):
         """
