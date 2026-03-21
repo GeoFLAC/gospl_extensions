@@ -613,8 +613,10 @@ class EnhancedModel(Model):
         # GoSPL applied upsub*dt to hGlobal internally (via applyTectonics), and
         # DES already has the same displacement from its own mechanical solver —
         # returning the full delta_h would double-count the tectonic uplift.
+        # hGlobal.getArray() uses PETSc's internal ordering (indexed by glbIDs),
+        # while _upsub_override uses mCoords ordering — use glbIDs to align them.
         if has_vel:
-            delta_h = delta_h - self._upsub_override * dt
+            delta_h = delta_h - self._upsub_override[self.glbIDs] * dt
 
         # Restore state
         if has_vel:
@@ -636,7 +638,11 @@ class EnhancedModel(Model):
             weights[onIDs] = 0.0
             weights[onIDs, 0] = 1.0
         weights /= weights.sum(axis=1, keepdims=True)
-        return (weights * delta_h[idxs]).sum(axis=1)  # (N,)
+        # delta_h is in PETSc global ordering; idxs indexes mCoords.
+        # Remap through glbIDs so delta_h[glbIDs[idxs]] gives the correct
+        # elevation change for the mCoords node referenced by each idxs entry.
+        delta_h_mcoords = delta_h[self.glbIDs]  # mCoords-ordered delta_h
+        return (weights * delta_h_mcoords[idxs]).sum(axis=1)  # (N,)
 
     def apply_drift_correction(self, src_pts, des_elevation, alpha=0.1, k=3, power=1.0):
         """
