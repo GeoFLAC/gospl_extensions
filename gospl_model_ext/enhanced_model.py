@@ -606,7 +606,7 @@ class EnhancedModel(Model):
         # Snapshot, run, diff on native mesh
         h_before = self.hGlobal.getArray().copy()
         self.runProcessesForDt(dt, verbose=False, skip_tectonics=False)
-        h_after  = self.hGlobal.getArray()
+        h_after  = self.hGlobal.getArray().copy()
         delta_h  = h_after - h_before
 
         # Strip tectonic uplift so only erosion+diffusion is returned to DES.
@@ -642,7 +642,8 @@ class EnhancedModel(Model):
         # Remap through glbIDs so delta_h[glbIDs[idxs]] gives the correct
         # elevation change for the mCoords node referenced by each idxs entry.
         delta_h_mcoords = delta_h[self.glbIDs]  # mCoords-ordered delta_h
-        return (weights * delta_h_mcoords[idxs]).sum(axis=1)  # (N,)
+        result = (weights * delta_h_mcoords[idxs]).sum(axis=1)
+        return result
 
     def apply_drift_correction(self, src_pts, des_elevation, alpha=0.1, k=3, power=1.0):
         """
