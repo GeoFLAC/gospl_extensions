@@ -609,6 +609,13 @@ class EnhancedModel(Model):
         h_after  = self.hGlobal.getArray()
         delta_h  = h_after - h_before
 
+        # Strip tectonic uplift so only erosion+diffusion is returned to DES.
+        # GoSPL applied upsub*dt to hGlobal internally (via applyTectonics), and
+        # DES already has the same displacement from its own mechanical solver —
+        # returning the full delta_h would double-count the tectonic uplift.
+        if has_vel:
+            delta_h = delta_h - self._upsub_override * dt
+
         # Restore state
         if has_vel:
             self.tecdata        = old_tecdata
