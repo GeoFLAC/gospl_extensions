@@ -170,7 +170,7 @@ This extension provides an `EnhancedModel` class that extends the goSPL `Model` 
 - **runProcessesForSteps**: Run processes for a specified number of time steps
 - **runProcessesUntilTime**: Run processes until a target time is reached
 
-**DES coupling API** (used by DynEarthSol):
+**DES coupling API** (used by [DynEarthSol](https://github.com/GeoFLAC/DynEarthSol)):
 - **apply_elevation_data**: Seed GoSPL's elevation field from external (DES) coordinates — called once at init and after remeshing
 - **set_surface_velocity**: IDW-interpolate all three DES surface velocity components (vx, vy, vz in m/yr) onto the GoSPL mesh; stored for the next `run_and_get_erosion` call
 - **set_uplift_rate**: IDW-interpolate vertical velocity only (vz in m/yr) onto the GoSPL mesh
