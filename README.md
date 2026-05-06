@@ -6,13 +6,13 @@
 
 ## Prerequisites
 
-**Important**: All extensions require the `gospl` conda environment to be activated:
+Install goSPL first by following the [conda installation instructions](https://gospl.readthedocs.io/en/latest/getting_started/installConda.html). This creates a `gospl` conda environment with goSPL and its Fortran extensions pre-installed.
+
+All extensions require this environment to be active:
 
 ```bash
 conda activate gospl
 ```
-
-The extensions depend on goSPL and its Fortran extensions, which are typically installed via conda.
 
 ### Additional Requirements for C++ Interface
 
