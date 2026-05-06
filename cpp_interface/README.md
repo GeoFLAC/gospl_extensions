@@ -172,26 +172,36 @@ This runs the complete C++ equivalent of `enhanced_model_advanced.py`:
 
 int main() {
     // Initialize
-    if (initialize_gospl_extensions() != 0) {
-        return 1;
-    }
-    
-    // Create model
+    if (initialize_gospl_extensions() != 0) return 1;
+
     ModelHandle model = create_enhanced_model("config.yml");
-    if (model < 0) {
-        finalize_gospl_extensions();
-        return 1;
+    if (model < 0) { finalize_gospl_extensions(); return 1; }
+
+    const int N = 100;  // number of DES surface nodes
+    double coords[N * 3];    // surface node coordinates
+    double elevations[N];    // surface node elevations (metres)
+    // ... fill coords and elevations from DES ...
+
+    // Seed GoSPL elevation from DES surface (once at init; repeat after remeshing)
+    apply_elevation_data(model, coords, elevations, N, 3, 1.0);
+
+    // Coupling loop
+    double dt_yr = 1000.0;
+    for (int step = 0; step < num_steps; ++step) {
+        double vx_yr[N], vy_yr[N], vz_yr[N];
+        // ... compute time-averaged DES surface velocities (m/yr) ...
+
+        // Send all three velocity components to GoSPL
+        set_surface_velocity(model, coords, vx_yr, vy_yr, vz_yr, N, 3, 1.0);
+
+        // Run GoSPL; erosion[i] = delta_h (erosion+diffusion only, uplift excluded)
+        double erosion[N];
+        run_and_get_erosion(model, dt_yr, coords, N, erosion, 3, 1.0);
+
+        // Add erosion[i] to DES surface node z-coordinates
+        for (int i = 0; i < N; ++i) coords[i*3 + 2] += erosion[i];
     }
-    
-    // Run simulation
-    double elapsed = run_processes_for_dt(model, 1.0, 1);  // dt=1.0, verbose=true
-    
-    // Apply velocity data
-    double coords[300], velocities[300];  // 100 points * 3 components
-    create_velocity_field(0.0, 5.0, 5.0, 0.1, coords, velocities);
-    apply_velocity_data(model, coords, velocities, 100, 1.0, 3, 1.0);
-    
-    // Cleanup
+
     destroy_model(model);
     finalize_gospl_extensions();
     return 0;
@@ -204,23 +214,28 @@ int main() {
 - `int initialize_gospl_extensions()` - Initialize Python and load extensions
 - `void finalize_gospl_extensions()` - Clean up Python interpreter
 
-### Model Management  
+### Model Management
 - `ModelHandle create_enhanced_model(const char* config_path)` - Create model instance
 - `int destroy_model(ModelHandle handle)` - Destroy model instance
 
 ### Time Control
-- `double run_processes_for_dt(ModelHandle, double dt, int verbose)` - Run for specific dt
-- `int run_processes_for_steps(ModelHandle, int num_steps, double dt, int verbose)` - Run multiple steps
-- `int run_processes_until_time(ModelHandle, double target_time, double dt, int verbose)` - Run until time
+- `double run_processes_for_dt(ModelHandle, double dt, int verbose, int skip_tectonics)` - Run for specific dt
+- `int run_processes_for_steps(ModelHandle, int num_steps, double dt, int verbose, int skip_tectonics)` - Run multiple steps
+- `int run_processes_until_time(ModelHandle, double target_time, double dt, int verbose, int skip_tectonics)` - Run until time
 
-### Velocity Data
-- `int apply_velocity_data(ModelHandle, const double* coords, const double* velocities, int num_points, double timer, int k, double power)` - Apply external velocities
-- `int interpolate_elevation_to_points(ModelHandle, const double* coords, int num_points, double* elevations, int k, double power)` - Interpolate elevation field to external points
-- `int create_velocity_field(double t, double center_x, double center_y, double amplitude, double* coords, double* velocities)` - Generate test velocity field
+### DES Coupling API
+- `int apply_elevation_data(ModelHandle, const double* coords, const double* elevations, int num_points, int k, double power)` - Seed GoSPL elevation from DES surface (called once at init and after remeshing)
+- `int set_surface_velocity(ModelHandle, const double* coords, const double* vx_yr, const double* vy_yr, const double* vz_yr, int num_points, int k, double power)` - IDW-interpolate all three DES surface velocity components onto GoSPL mesh; stored for the next `run_and_get_erosion` call
+- `int set_uplift_rate(ModelHandle, const double* coords, const double* vz_yr, int num_points, int k, double power)` - IDW-interpolate vertical velocity only (vz in m/yr) onto GoSPL mesh
+- `int run_and_get_erosion(ModelHandle, double dt, const double* coords, int num_points, double* erosion, int k, double power)` - Run GoSPL for dt years; return net erosion (m) at query points (uplift excluded)
+- `int apply_drift_correction(ModelHandle, const double* coords, const double* des_elev, int num_points, double alpha, int k, double power)` - Blend GoSPL elevation toward DES elevation with strength alpha [0,1]
+- `int interpolate_elevation_to_points(ModelHandle, const double* coords, int num_points, double* elevations, int k, double power)` - Query current GoSPL elevation at arbitrary coordinates
 
 ### Utilities
 - `double get_current_time(ModelHandle)` - Get current simulation time
 - `double get_time_step(ModelHandle)` - Get model time step
+- `int apply_velocity_data(ModelHandle, const double* coords, const double* velocities, int num_points, double timer, int k, double power)` - Apply DataDrivenTectonics velocity field
+- `int create_velocity_field(double t, double center_x, double center_y, double amplitude, double* coords, double* velocities)` - Generate test velocity field
 
 ## DynEarthSol Integration
 
@@ -277,8 +292,8 @@ The C++ interface is specifically designed to integrate with DynEarthSol, a fini
 5. **Configure simulation:**
    ```cfg
    # In DynEarthSol config file:
-   control.surface_process_option = 11
-   control.surface_process_gospl_config_file = "gospl_config.yml"
+   surface_process_option = 11
+   surface_process_gospl_config_file = ./gospl_config.yml
    ```
 
 ### Directory Structure After Integration
@@ -304,12 +319,12 @@ DynEarthSol/
 
 ### Usage in DynEarthSol
 
-When properly configured, DynEarthSol will:
+When properly configured, DynEarthSol follows the ASPECT–FastScape coupling scheme:
 1. Initialize GoSPL at startup using the specified config file
-2. At each timestep, extract surface node coordinates and velocities
-3. Pass this data to GoSPL for landscape evolution
-4. Receive updated surface elevations from GoSPL
-5. Update the DynEarthSol mesh with new surface topography
+2. At the first coupling event, seed GoSPL's elevation from DES surface nodes via `apply_elevation_data`; GoSPL owns the topography from this point on (and after each remesh)
+3. At each coupling event, compute time-averaged DES surface velocities (Δcoord/Δt over the coupling interval) and send them to GoSPL via `set_surface_velocity`
+4. Call `run_and_get_erosion` to advance GoSPL; it returns delta_h (erosion + diffusion only, uplift excluded because DES already moved the nodes via its Lagrangian solver)
+5. Add delta_h to DES surface node z-coordinates
 
 The integration is seamless and controlled by the `surface_process_option = 11` setting.
 

@@ -165,9 +165,17 @@ This extension provides an `EnhancedModel` class that extends the goSPL `Model` 
 
 ### Features
 
+**Time control:**
 - **runProcessesForDt**: Run processes for a specific time step 'dt'
-- **runProcessesForSteps**: Run processes for a specified number of time steps  
+- **runProcessesForSteps**: Run processes for a specified number of time steps
 - **runProcessesUntilTime**: Run processes until a target time is reached
+
+**DES coupling API** (used by DynEarthSol):
+- **apply_elevation_data**: Seed GoSPL's elevation field from external (DES) coordinates — called once at init and after remeshing
+- **set_surface_velocity**: IDW-interpolate all three DES surface velocity components (vx, vy, vz in m/yr) onto the GoSPL mesh; stored for the next `run_and_get_erosion` call
+- **set_uplift_rate**: IDW-interpolate vertical velocity only (vz in m/yr) onto the GoSPL mesh
+- **run_and_get_erosion**: Run GoSPL for dt years and return net erosion (m) at query points; horizontal advection and uplift are applied internally, and the returned delta_h excludes uplift (which DES already handles via its Lagrangian solver)
+- **apply_drift_correction**: Gently blend GoSPL's elevation field toward DES elevation with strength alpha (0=no change, 1=full reset)
 
 ### Usage
 
@@ -177,14 +185,28 @@ from gospl_model_ext import EnhancedModel
 # Create enhanced model
 model = EnhancedModel("config.yml")
 
-# Run for specific dt
+# --- Time control ---
 model.runProcessesForDt(dt=1000.0)
-
-# Run for multiple steps with specific dt
 model.runProcessesForSteps(num_steps=10, dt=1000.0)
-
-# Run until target time is reached
 model.runProcessesUntilTime(target_time=50000.0, dt=1000.0)
+
+# --- DES coupling (ASPECT-FastScape scheme) ---
+import numpy as np
+
+# Seed GoSPL elevation from DES surface (once at init and after remeshing)
+des_coords = np.array(...)   # shape (N, 3), DES surface node coordinates
+des_elev   = np.array(...)   # shape (N,),   DES surface elevations in metres
+model.apply_elevation_data(des_coords, des_elev, k=3, power=1.0)
+
+# Each coupling step: send DES surface velocities, run GoSPL, get delta_h
+vx_yr = np.array(...)        # shape (N,), x-velocity in m/yr
+vy_yr = np.array(...)        # shape (N,), y-velocity in m/yr (0 for 2D)
+vz_yr = np.array(...)        # shape (N,), vertical velocity in m/yr
+model.set_surface_velocity(des_coords, vx_yr, vy_yr, vz_yr, k=3, power=1.0)
+
+query_pts = des_coords       # query points for the returned delta_h
+delta_h = model.run_and_get_erosion(dt_yr, query_pts, k=3, power=1.0)
+# delta_h is erosion + diffusion only; add it to DES surface node elevations
 ```
 
 ### Files
@@ -286,11 +308,17 @@ gospl_extensions/
 initialize_gospl_extensions();
 ModelHandle model = create_enhanced_model("config.yml");
 
-// Run simulation with time control
-double elapsed = run_processes_for_dt(model, 1000.0, 1);
+// Seed GoSPL elevation from DES surface (once at init and after remeshing)
+apply_elevation_data(model, coords, elevations, num_points, 3, 1.0);
 
-// Apply velocity data
-apply_velocity_data(model, coords, velocities, num_points, 1.0, 3, 1.0);
+// Each coupling step: send DES surface velocities, run GoSPL, get delta_h
+double vx_yr[num_points], vy_yr[num_points], vz_yr[num_points];
+// ... fill vx_yr, vy_yr, vz_yr from DES ...
+set_surface_velocity(model, coords, vx_yr, vy_yr, vz_yr, num_points, 3, 1.0);
+
+double erosion[num_points];
+run_and_get_erosion(model, dt_yr, coords, num_points, erosion, 3, 1.0);
+// erosion[i] is erosion + diffusion only; add to DES surface node elevations
 
 // Cleanup
 destroy_model(model);
