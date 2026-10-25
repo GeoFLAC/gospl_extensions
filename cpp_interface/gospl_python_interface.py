@@ -53,6 +53,14 @@ def create_enhanced_model(config_path: str) -> int:
     global _models, _next_handle
     
     try:
+        # GoSPL's rosw solvers (hillslope, soilSPL) use MATCHSTEP and then read
+        # the options database. MATCHSTEP's final-step check uses an absolute
+        # tolerance, so a round-off overshoot of max_time aborts the solve with
+        # "bad hmax in TSAdaptChoose()" (error 77). Interpolating to max_time
+        # instead avoids that check.
+        import petsc4py
+        petsc4py.PETSc.Options()["ts_exact_final_time"] = "interpolate"
+
         # Create enhanced model (now has interpolate_elevation_to_points built-in)
         model = EnhancedModel(config_path.decode() if isinstance(config_path, bytes) else config_path)
         

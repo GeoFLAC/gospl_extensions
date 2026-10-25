@@ -257,7 +257,7 @@ The C++ interface includes special support for integration with DynEarthSol, a f
 
 2. **Integration with DynEarthSol:**
    - Clone gospl_extensions in your DynEarthSol directory
-   - Set `use_gospl = 1` in DynEarthSol's Makefile
+   - Set `usegospl = 1` in DynEarthSol's Makefile
    - Build DynEarthSol normally - it will automatically link with gospl_extensions
 
 3. **Usage in DynEarthSol:**
