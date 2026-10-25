@@ -280,7 +280,7 @@ The C++ interface is specifically designed to integrate with DynEarthSol, a fini
 3. **Configure DynEarthSol build:**
    ```makefile
    # In DynEarthSol Makefile, set:
-   use_gospl = 1
+   usegospl = 1
    ```
 
 4. **Build DynEarthSol:**
@@ -300,7 +300,7 @@ The C++ interface is specifically designed to integrate with DynEarthSol, a fini
 
 ```
 DynEarthSol/
-├── Makefile                          # use_gospl = 1
+├── Makefile                          # usegospl = 1
 ├── gospl_extensions/                 # Cloned repository
 │   ├── lib/
 │   │   └── libgospl_extensions.so    # Built by make install-local
