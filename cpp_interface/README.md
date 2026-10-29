@@ -285,7 +285,6 @@ The C++ interface is specifically designed to integrate with DynEarthSol, a fini
 
 4. **Build DynEarthSol:**
    ```bash
-   conda deactivate  # Use system compiler for DynEarthSol
    make
    ```
 
